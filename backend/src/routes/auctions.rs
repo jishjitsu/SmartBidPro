@@ -85,7 +85,7 @@ pub async fn update_auction(
     
     // Check if auction exists and user is authorized
     let existing = collection
-        .find_one(doc! { "_id": &id }, None)
+        .find_one(doc! { "_id": &id })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound)?;
@@ -126,7 +126,7 @@ pub async fn delete_auction(
     
     // Check if auction exists and user is authorized
     let existing = collection
-        .find_one(doc! { "_id": &id }, None)
+        .find_one(doc! { "_id": &id })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound)?;
