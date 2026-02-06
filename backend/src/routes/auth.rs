@@ -2,7 +2,7 @@ use mongodb::Database;
 use rocket::serde::json::Json;
 use rocket::{State, http::Status};
 use bcrypt::{hash, verify, DEFAULT_COST};
-use crate::models::{LoginRequest, LoginResponse, User, UserInfo, UserRole};
+use crate::models::{LoginRequest, LoginResponse, User, UserInfo};
 use crate::auth::create_jwt;
 use mongodb::bson::doc;
 
@@ -15,7 +15,7 @@ pub async fn register(
     
     // Check if user already exists
     let existing_user = collection
-        .find_one(doc! { "email": &user_data.email }, None)
+        .find_one(doc! { "email": &user_data.email })
         .await
         .map_err(|_| Status::InternalServerError)?;
     
@@ -37,7 +37,7 @@ pub async fn register(
     };
     
     collection
-        .insert_one(&new_user, None)
+        .insert_one(&new_user)
         .await
         .map_err(|_| Status::InternalServerError)?;
     
@@ -57,7 +57,7 @@ pub async fn login(
     let collection = db.collection::<User>("users");
     
     let user = collection
-        .find_one(doc! { "email": &credentials.email }, None)
+        .find_one(doc! { "email": &credentials.email })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::Unauthorized)?;

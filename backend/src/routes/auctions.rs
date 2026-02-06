@@ -14,7 +14,7 @@ pub async fn get_auctions(
     let collection = db.collection::<Auction>("auctions");
     
     let mut cursor = collection
-        .find(None, None)
+        .find(doc! {})
         .await
         .map_err(|_| Status::InternalServerError)?;
     
@@ -37,7 +37,7 @@ pub async fn get_auction(
     let collection = db.collection::<Auction>("auctions");
     
     let auction = collection
-        .find_one(doc! { "_id": &id }, None)
+        .find_one(doc! { "_id": &id })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound)?;
@@ -67,7 +67,7 @@ pub async fn create_auction(
     };
     
     collection
-        .insert_one(&new_auction, None)
+        .insert_one(&new_auction)
         .await
         .map_err(|_| Status::InternalServerError)?;
     
@@ -109,7 +109,7 @@ pub async fn update_auction(
     };
     
     collection
-        .replace_one(doc! { "_id": &id }, &updated_auction, None)
+        .replace_one(doc! { "_id": &id }, &updated_auction)
         .await
         .map_err(|_| Status::InternalServerError)?;
     
@@ -137,7 +137,7 @@ pub async fn delete_auction(
     }
     
     collection
-        .delete_one(doc! { "_id": &id }, None)
+        .delete_one(doc! { "_id": &id })
         .await
         .map_err(|_| Status::InternalServerError)?;
     
