@@ -13,3 +13,5 @@ jsonwebtoken = "9.3"
 bcrypt = "0.16"
 chrono = { version = "0.4", features = ["serde"] }
 dotenv = "0.15"
+uuid = { version = "1.20", features = ["v4"] }
+rocket_cors = "0.6.0"
