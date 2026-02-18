@@ -76,7 +76,7 @@ cargo run
 ```
 
 The Rocket server will start on `http://localhost:8000`
-
+z
 ### Frontend Setup
 
 1. Navigate to the project root:

@@ -7,7 +7,7 @@ mod models;
 mod routes;
 
 use rocket::http::Method;
-use rocket_cors::{AllowedOrigins, CorsOptions};
+use rocket_cors::{AllowedOrigins, AllowedHeaders, CorsOptions};
 
 #[get("/")]
 fn index() -> &'static str {
@@ -31,11 +31,12 @@ async fn rocket() -> _ {
     let cors = CorsOptions::default()
         .allowed_origins(AllowedOrigins::all())
         .allowed_methods(
-            vec![Method::Get, Method::Post, Method::Put, Method::Delete]
+            vec![Method::Get, Method::Post, Method::Put, Method::Delete, Method::Options]
                 .into_iter()
                 .map(From::from)
                 .collect(),
         )
+        .allowed_headers(AllowedHeaders::some(&["Authorization", "Content-Type", "Accept"]))
         .allow_credentials(true)
         .to_cors()
         .expect("Error creating CORS fairing");

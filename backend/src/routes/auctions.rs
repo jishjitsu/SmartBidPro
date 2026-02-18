@@ -1,10 +1,11 @@
 use mongodb::Database;
 use rocket::serde::json::Json;
 use rocket::{State, http::Status};
-use crate::models::Auction;
+use crate::models::{Auction, CreateAuctionRequest};
 use crate::auth::AuthenticatedUser;
-use mongodb::bson::doc;
+use mongodb::bson::{doc, oid::ObjectId};
 use chrono::Utc;
+use futures::stream::TryStreamExt;
 
 #[get("/auctions")]
 pub async fn get_auctions(
@@ -13,17 +14,21 @@ pub async fn get_auctions(
 ) -> Result<Json<Vec<Auction>>, Status> {
     let collection = db.collection::<Auction>("auctions");
     
-    let mut cursor = collection
+    let cursor = collection
         .find(doc! {})
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(|e| {
+            eprintln!("Error finding auctions: {:?}", e);
+            Status::InternalServerError
+        })?;
     
-    let mut auctions = Vec::new();
-    while cursor.advance().await.map_err(|_| Status::InternalServerError)? {
-        let auction = cursor.deserialize_current()
-            .map_err(|_| Status::InternalServerError)?;
-        auctions.push(auction);
-    }
+    let auctions: Vec<Auction> = cursor
+        .try_collect()
+        .await
+        .map_err(|e| {
+            eprintln!("Error collecting auctions: {:?}", e);
+            Status::InternalServerError
+        })?;
     
     Ok(Json(auctions))
 }
@@ -36,8 +41,11 @@ pub async fn get_auction(
 ) -> Result<Json<Auction>, Status> {
     let collection = db.collection::<Auction>("auctions");
     
+    let object_id = ObjectId::parse_str(&id)
+        .map_err(|_| Status::BadRequest)?;
+    
     let auction = collection
-        .find_one(doc! { "_id": &id })
+        .find_one(doc! { "_id": object_id })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound)?;
@@ -49,12 +57,12 @@ pub async fn get_auction(
 pub async fn create_auction(
     db: &State<Database>,
     user: AuthenticatedUser,
-    auction_data: Json<Auction>,
+    auction_data: Json<CreateAuctionRequest>,
 ) -> Result<Json<Auction>, Status> {
     let collection = db.collection::<Auction>("auctions");
     
     let new_auction = Auction {
-        id: Some(uuid::Uuid::new_v4().to_string()),
+        id: None, // Let MongoDB generate the ObjectId
         title: auction_data.title.clone(),
         description: auction_data.description.clone(),
         status: auction_data.status.clone(),
@@ -66,12 +74,20 @@ pub async fn create_auction(
         updated_at: Utc::now(),
     };
     
-    collection
+    let result = collection
         .insert_one(&new_auction)
         .await
         .map_err(|_| Status::InternalServerError)?;
     
-    Ok(Json(new_auction))
+    let inserted_id = result.inserted_id.as_object_id()
+        .ok_or(Status::InternalServerError)?;
+    
+    let created_auction = Auction {
+        id: Some(inserted_id),
+        ..new_auction
+    };
+    
+    Ok(Json(created_auction))
 }
 
 #[put("/auctions/<id>", data = "<auction_data>")]
@@ -83,9 +99,12 @@ pub async fn update_auction(
 ) -> Result<Json<Auction>, Status> {
     let collection = db.collection::<Auction>("auctions");
     
+    let object_id = ObjectId::parse_str(&id)
+        .map_err(|_| Status::BadRequest)?;
+    
     // Check if auction exists and user is authorized
     let existing = collection
-        .find_one(doc! { "_id": &id })
+        .find_one(doc! { "_id": object_id })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound)?;
@@ -96,7 +115,7 @@ pub async fn update_auction(
     }
     
     let updated_auction = Auction {
-        id: Some(id.clone()),
+        id: Some(object_id),
         title: auction_data.title.clone(),
         description: auction_data.description.clone(),
         status: auction_data.status.clone(),
@@ -109,7 +128,7 @@ pub async fn update_auction(
     };
     
     collection
-        .replace_one(doc! { "_id": &id }, &updated_auction)
+        .replace_one(doc! { "_id": object_id }, &updated_auction)
         .await
         .map_err(|_| Status::InternalServerError)?;
     
@@ -124,9 +143,12 @@ pub async fn delete_auction(
 ) -> Result<Status, Status> {
     let collection = db.collection::<Auction>("auctions");
     
+    let object_id = ObjectId::parse_str(&id)
+        .map_err(|_| Status::BadRequest)?;
+    
     // Check if auction exists and user is authorized
     let existing = collection
-        .find_one(doc! { "_id": &id })
+        .find_one(doc! { "_id": object_id })
         .await
         .map_err(|_| Status::InternalServerError)?
         .ok_or(Status::NotFound)?;
@@ -137,7 +159,7 @@ pub async fn delete_auction(
     }
     
     collection
-        .delete_one(doc! { "_id": &id })
+        .delete_one(doc! { "_id": object_id })
         .await
         .map_err(|_| Status::InternalServerError)?;
     
