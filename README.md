@@ -102,3 +102,4 @@ To make changes:
 
 1. **Backend**: Edit files in `backend/src/`, rebuild with `cargo build`
 2. **Frontend**: Edit files in `app/` or `components/`, changes hot-reload automatically
+3. **Populating Users**: Run /scripts/create-test-user.js using node to seed users into your database

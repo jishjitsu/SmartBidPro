@@ -220,18 +220,21 @@ export const getAdminStats = (auctions: any[]) => {
   const totalBids = auctions.reduce((acc, auction) => {
     return acc + (auction.bid_count || Math.floor(Math.random() * 8) + 2)
   }, 0)
-  
+
   const avgCompliance = Math.floor(Math.random() * 10) + 82
-  
+  const totalValue = auctions.reduce((acc, a) => acc + (a.minimum_bid || 0), 0)
+
   return {
     totalTenders: auctions.length,
     activeBids: totalBids,
     avgComplianceScore: avgCompliance,
-    tendersAwarded: auctions.filter(a => a.status === "Awarded").length
+    tendersAwarded: auctions.filter(a => a.status === "Awarded").length,
+    totalValue,
+    userGrowth: Math.floor(Math.random() * 15) + 8,
   }
 }
 
-// Vendor dashboard stats  
+// Vendor dashboard stats (legacy)
 export const getVendorStats = () => {
   return {
     activeBids: Math.floor(Math.random() * 5) + 2,
@@ -239,6 +242,61 @@ export const getVendorStats = () => {
     winRate: Math.floor(Math.random() * 30) + 40,
     avgComplianceScore: Math.floor(Math.random() * 15) + 80
   }
+}
+
+// Vendor profile / registration-readiness stats
+export const getVendorProfileStats = () => {
+  const docsCompliant = Math.floor(Math.random() * 2) + 6
+  const verifiedCats = Math.floor(Math.random() * 3) + 3
+  return {
+    profileStrength: Math.floor(Math.random() * 20) + 72,
+    verifiedCategories: verifiedCats,
+    totalCategories: 8,
+    activeApplications: Math.floor(Math.random() * 4) + 1,
+    profileViews: Math.floor(Math.random() * 40) + 20,
+    documentsCompliant: docsCompliant,
+    totalDocuments: 9,
+    missingDocs: ["Insurance Certificate", "Tax Clearance"].slice(0, 9 - docsCompliant),
+  }
+}
+
+// Bidder action/competition stats
+export const getBidderStats = () => {
+  return {
+    activeBids: Math.floor(Math.random() * 5) + 2,
+    winRate: Math.floor(Math.random() * 30) + 40,
+    pendingClarifications: Math.floor(Math.random() * 3),
+    bidsDueThisWeek: Math.floor(Math.random() * 2) + 1,
+    draftBids: Math.floor(Math.random() * 2) + 1,
+    avgComplianceScore: Math.floor(Math.random() * 15) + 78,
+  }
+}
+
+// Admin activity feed
+export interface ActivityItem {
+  id: string
+  type: "bid" | "registration" | "award" | "alert" | "compliance"
+  message: string
+  actor: string
+  timestamp: string
+  severity: "info" | "success" | "warning"
+}
+
+export const getActivityFeed = (): ActivityItem[] => {
+  const raw: Omit<ActivityItem, "id" | "timestamp">[] = [
+    { type: "bid", message: "New bid submitted on Tender #T-2204", actor: "TechCorp Solutions", severity: "info" },
+    { type: "registration", message: "New vendor registration pending review", actor: "BuildRight Ltd", severity: "success" },
+    { type: "compliance", message: "Insurance certificate expired", actor: "Apex Builders", severity: "warning" },
+    { type: "award", message: "Tender T-2198 awarded successfully", actor: "Admin", severity: "success" },
+    { type: "bid", message: "Bid amount revised upward", actor: "Global IT Partners", severity: "info" },
+    { type: "alert", message: "Tender deadline in 48 hours", actor: "System", severity: "warning" },
+    { type: "compliance", message: "Compliance score updated to 91%", actor: "Summit Engineering", severity: "success" },
+  ]
+  return raw.map((a, i) => ({
+    ...a,
+    id: `act_${i}`,
+    timestamp: new Date(Date.now() - i * 23 * 60 * 1000).toISOString(),
+  }))
 }
 
 // Simulate AI processing delay
