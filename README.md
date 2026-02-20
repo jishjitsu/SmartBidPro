@@ -9,7 +9,7 @@ Built using Next.js and Rocket(Rust)
 ## Tech Stack
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
+- **Next.js 16** - React framework with App Router
 - **shadcn/ui** - Beautiful, accessible UI components
 - **Tailwind CSS** - Utility-first CSS framework
 - **TypeScript** - Type-safe development
