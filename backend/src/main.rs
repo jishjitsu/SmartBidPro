@@ -55,5 +55,9 @@ async fn rocket() -> _ {
             routes::auctions::create_auction,
             routes::auctions::update_auction,
             routes::auctions::delete_auction,
+            routes::bids::apply_to_tender,
+            routes::bids::get_tender_bids,
+            routes::bids::award_bid,
+            routes::bids::get_vendor_bids,
         ])
 }

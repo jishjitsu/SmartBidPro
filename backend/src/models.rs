@@ -13,11 +13,10 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum UserRole {
     Admin,
-    Bidder,
     Vendor,
     Auditor,
 }
@@ -52,14 +51,20 @@ pub struct Auction {
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub minimum_bid: f64,
+    #[serde(default = "default_category")]
+    pub category: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
+fn default_category() -> String {
+    "general".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum BidStatus {
-    Pending,
-    Accepted,
+    Applied,
+    Awarded,
     Rejected,
 }
 
@@ -83,14 +88,18 @@ pub struct ComplianceAnalysis {
 pub struct Bid {
     #[serde(rename = "_id", skip_serializing_if = "Option::is_none", serialize_with = "serialize_object_id")]
     pub id: Option<ObjectId>,
-    pub auction_id: String,
-    pub bidder_id: String,
-    pub bidder_name: String,
-    pub bidder_company: String,
+    pub tender_id: String,
+    pub vendor_id: String,
+    pub vendor_name: String,
+    pub vendor_company: String,
     pub bid_amount: f64,
-    pub compliance_analysis: ComplianceAnalysis,
+    pub proposal_text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub documents: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compliance_analysis: Option<ComplianceAnalysis>,
     pub status: BidStatus,
-    pub submitted_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -141,11 +150,27 @@ pub struct CreateAuctionRequest {
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub minimum_bid: f64,
+    #[serde(default = "default_category")]
+    pub category: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateAuctionRequest {
+    pub title: String,
+    pub description: String,
+    pub status: AuctionStatus,
+    pub start_date: DateTime<Utc>,
+    pub end_date: DateTime<Utc>,
+    pub minimum_bid: f64,
+    pub category: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateBidRequest {
-    pub auction_id: String,
     pub bid_amount: f64,
-    pub compliance_analysis: ComplianceAnalysis,
+    pub proposal_text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub documents: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compliance_analysis: Option<ComplianceAnalysis>,
 }

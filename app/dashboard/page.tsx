@@ -20,7 +20,7 @@ export default function DashboardPage() {
     // Route based on role
     if (parsedUser.role === "admin") {
       router.push("/admin/dashboard")
-    } else if (parsedUser.role === "vendor" || parsedUser.role === "bidder") {
+    } else if (parsedUser.role === "vendor") {
       router.push("/vendor/dashboard")
     } else {
       router.push("/vendor/dashboard") // Default fallback

@@ -43,6 +43,9 @@ export default function CreateTenderPage() {
     
     try {
       const token = localStorage.getItem("token")
+      // Convert INR to USD for backend storage (divide by 82.5)
+      const minimumBidUSD = parseFloat(formData.minimum_bid) / 82.5
+      
       const response = await fetch("http://localhost:8000/api/auctions", {
         method: "POST",
         headers: {
@@ -52,7 +55,8 @@ export default function CreateTenderPage() {
         body: JSON.stringify({
           title: formData.title,
           description: formData.description,
-          minimum_bid: parseFloat(formData.minimum_bid),
+          category: formData.category,
+          minimum_bid: minimumBidUSD,
           start_date: new Date(formData.start_date).toISOString(),
           end_date: new Date(formData.end_date).toISOString(),
           status: "Open",
@@ -169,23 +173,36 @@ export default function CreateTenderPage() {
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="w-full p-2 rounded-md bg-slate-800 border border-slate-700 text-white"
+                  aria-label="Tender category"
                 >
                   <option value="general">General Procurement</option>
                   <option value="construction">Construction</option>
                   <option value="it_services">IT Services</option>
+                  <option value="healthcare">Healthcare</option>
+                  <option value="education">Education</option>
+                  <option value="transportation">Transportation</option>
+                  <option value="defense">Defense & Security</option>
+                  <option value="agriculture">Agriculture</option>
+                  <option value="energy">Energy & Utilities</option>
+                  <option value="manufacturing">Manufacturing</option>
+                  <option value="consulting">Consulting Services</option>
+                  <option value="infrastructure">Infrastructure</option>
+                  <option value="maintenance">Maintenance & Repair</option>
+                  <option value="supplies">Supplies & Equipment</option>
                 </select>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-300">Minimum Bid Amount ($) *</label>
+                <label className="text-sm font-medium text-slate-300">Minimum Bid Amount (₹) *</label>
                 <Input
                   type="number"
                   value={formData.minimum_bid}
                   onChange={(e) => setFormData({ ...formData, minimum_bid: e.target.value })}
-                  placeholder="100000"
+                  placeholder="8250000"
                   className="bg-slate-800 border-slate-700 text-white"
                   required
                 />
+                <p className="text-xs text-slate-500">Enter amount in Indian Rupees (e.g., ₹82,50,000)</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -195,9 +212,11 @@ export default function CreateTenderPage() {
                     type="date"
                     value={formData.start_date}
                     onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
                     className="bg-slate-800 border-slate-700 text-white"
                     required
                   />
+                  <p className="text-xs text-slate-500">Cannot select past dates</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-300">End Date *</label>
@@ -205,9 +224,11 @@ export default function CreateTenderPage() {
                     type="date"
                     value={formData.end_date}
                     onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                    min={formData.start_date || new Date().toISOString().split('T')[0]}
                     className="bg-slate-800 border-slate-700 text-white"
                     required
                   />
+                  <p className="text-xs text-slate-500">Must be after start date</p>
                 </div>
               </div>
 
@@ -322,7 +343,7 @@ export default function CreateTenderPage() {
                   <div className="p-4 bg-slate-800 rounded-lg">
                     <label className="text-sm text-slate-500">Minimum Bid</label>
                     <p className="text-white font-medium mt-1">
-                      ${parseFloat(formData.minimum_bid).toLocaleString()}
+                    ₹{parseFloat(formData.minimum_bid).toLocaleString('en-IN')}
                     </p>
                   </div>
                 </div>

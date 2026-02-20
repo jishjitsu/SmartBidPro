@@ -1,9 +1,9 @@
 use mongodb::Database;
 use rocket::serde::json::Json;
 use rocket::{State, http::Status};
-use crate::models::{Auction, CreateAuctionRequest};
+use crate::models::{Auction, CreateAuctionRequest, UpdateAuctionRequest};
 use crate::auth::AuthenticatedUser;
-use mongodb::bson::{doc, oid::ObjectId};
+use mongodb::bson::{self, doc, oid::ObjectId};
 use chrono::Utc;
 use futures::stream::TryStreamExt;
 
@@ -70,6 +70,7 @@ pub async fn create_auction(
         start_date: auction_data.start_date,
         end_date: auction_data.end_date,
         minimum_bid: auction_data.minimum_bid,
+        category: auction_data.category.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -95,7 +96,7 @@ pub async fn update_auction(
     db: &State<Database>,
     user: AuthenticatedUser,
     id: String,
-    auction_data: Json<Auction>,
+    auction_data: Json<UpdateAuctionRequest>,
 ) -> Result<Json<Auction>, Status> {
     let collection = db.collection::<Auction>("auctions");
     
@@ -114,23 +115,34 @@ pub async fn update_auction(
         return Err(Status::Forbidden);
     }
     
-    let updated_auction = Auction {
-        id: Some(object_id),
-        title: auction_data.title.clone(),
-        description: auction_data.description.clone(),
-        status: auction_data.status.clone(),
-        created_by: existing.created_by,
-        start_date: auction_data.start_date,
-        end_date: auction_data.end_date,
-        minimum_bid: auction_data.minimum_bid,
-        created_at: existing.created_at,
-        updated_at: Utc::now(),
+    // Use update_one with $set to avoid _id immutability error
+    let update_doc = doc! {
+        "$set": {
+            "title": &auction_data.title,
+            "description": &auction_data.description,
+            "status": bson::to_bson(&auction_data.status).unwrap(),
+            "start_date": bson::to_bson(&auction_data.start_date).unwrap(),
+            "end_date": bson::to_bson(&auction_data.end_date).unwrap(),
+            "minimum_bid": auction_data.minimum_bid,
+            "category": &auction_data.category,
+            "updated_at": bson::to_bson(&Utc::now()).unwrap(),
+        }
     };
     
     collection
-        .replace_one(doc! { "_id": object_id }, &updated_auction)
+        .update_one(doc! { "_id": object_id }, update_doc)
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(|e| {
+            eprintln!("Error updating auction: {:?}", e);
+            Status::InternalServerError
+        })?;
+    
+    // Return the updated auction
+    let updated_auction = collection
+        .find_one(doc! { "_id": object_id })
+        .await
+        .map_err(|_| Status::InternalServerError)?
+        .ok_or(Status::InternalServerError)?;
     
     Ok(Json(updated_auction))
 }

@@ -46,17 +46,17 @@ export function AIComplianceAnalysis({
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
-      case "Low": return "text-emerald-600 bg-emerald-50 border-emerald-200"
-      case "Medium": return "text-amber-600 bg-amber-50 border-amber-200"
-      case "High": return "text-red-600 bg-red-50 border-red-200"
-      default: return "text-gray-600 bg-gray-50 border-gray-200"
+      case "Low": return "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+      case "Medium": return "text-amber-400 bg-amber-500/10 border-amber-500/20"
+      case "High": return "text-red-400 bg-red-500/10 border-red-500/20"
+      default: return "text-slate-400 bg-slate-500/10 border-slate-500/20"
     }
   }
 
   const getScoreColor = (score: number) => {
-    if (score >= 85) return "text-emerald-600"
-    if (score >= 70) return "text-amber-600"
-    return "text-red-600"
+    if (score >= 85) return "text-emerald-400"
+    if (score >= 70) return "text-amber-400"
+    return "text-red-400"
   }
 
   const getStatusIcon = (status: string) => {
@@ -64,11 +64,11 @@ export function AIComplianceAnalysis({
       case "Excellent":
       case "Good":
       case "Pass":
-        return <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+        return <CheckCircle2 className="h-5 w-5 text-emerald-500" />
       case "Needs Improvement":
-        return <AlertTriangle className="h-5 w-5 text-amber-600" />
+        return <AlertTriangle className="h-5 w-5 text-amber-500" />
       case "Fail":
-        return <XCircle className="h-5 w-5 text-red-600" />
+        return <XCircle className="h-5 w-5 text-red-500" />
       default:
         return null
     }
@@ -76,13 +76,13 @@ export function AIComplianceAnalysis({
 
   if (isProcessing) {
     return (
-      <Card className="border-2">
+      <Card className="bg-slate-900 border-slate-800 border-2">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
             <div>
-              <CardTitle className="text-lg">AI Compliance Analysis</CardTitle>
-              <CardDescription className="mt-1">
+              <CardTitle className="text-lg text-white">AI Compliance Analysis</CardTitle>
+              <CardDescription className="mt-1 text-slate-400">
                 Processing documentation and calculating compliance scores...
               </CardDescription>
             </div>
@@ -91,24 +91,24 @@ export function AIComplianceAnalysis({
         <CardContent className="space-y-6">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-32 bg-slate-800" />
+              <Skeleton className="h-4 w-16 bg-slate-800" />
             </div>
-            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-2 w-full bg-slate-800" />
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-32 bg-slate-800" />
+              <Skeleton className="h-4 w-16 bg-slate-800" />
             </div>
-            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-2 w-full bg-slate-800" />
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-32 bg-slate-800" />
+              <Skeleton className="h-4 w-16 bg-slate-800" />
             </div>
-            <Skeleton className="h-2 w-full" />
+            <Skeleton className="h-2 w-full bg-slate-800" />
           </div>
         </CardContent>
       </Card>
@@ -117,9 +117,9 @@ export function AIComplianceAnalysis({
 
   if (!data) {
     return (
-      <Card className="border-2 border-dashed">
+      <Card className="bg-slate-900 border-slate-800 border-2 border-dashed">
         <CardContent className="py-12">
-          <div className="text-center text-muted-foreground">
+          <div className="text-center text-slate-500">
             <p>Upload documents to see AI compliance analysis</p>
           </div>
         </CardContent>
@@ -128,15 +128,15 @@ export function AIComplianceAnalysis({
   }
 
   return (
-    <Card className="border-2">
+    <Card className="bg-slate-900 border-slate-800 border-2">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+            <CardTitle className="text-lg flex items-center gap-2 text-white">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               AI Compliance Analysis
             </CardTitle>
-            <CardDescription className="mt-1">
+            <CardDescription className="mt-1 text-slate-400">
               Real-time analysis powered by AI
             </CardDescription>
           </div>
@@ -150,33 +150,33 @@ export function AIComplianceAnalysis({
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Overall Score */}
-        <div className="text-center py-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border">
-          <p className="text-sm text-muted-foreground mb-2">Overall Compliance Score</p>
+        <div className="text-center py-6 bg-slate-950 rounded-lg border border-slate-800">
+          <p className="text-sm text-slate-400 mb-2">Overall Compliance Score</p>
           <p className={`text-6xl font-bold ${getScoreColor(displayScore)}`}>
             {displayScore}%
           </p>
           <Progress 
             value={displayScore} 
-            className="h-2 mt-4 max-w-xs mx-auto" 
+            className="h-2 mt-4 max-w-xs mx-auto bg-slate-800" 
           />
         </div>
 
         {/* Detailed Breakdown */}
         {showDetailedBreakdown && (
           <div className="space-y-4">
-            <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
+            <h4 className="font-semibold text-sm text-slate-500 uppercase tracking-wide">
               Compliance Breakdown
             </h4>
 
             {/* Documentation */}
-            <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
+            <div className="space-y-2 p-4 bg-slate-950 border border-slate-800 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {getStatusIcon(data.ai_analysis.breakdown.documentation.status)}
-                  <span className="font-medium">Documentation</span>
+                  <span className="font-medium text-slate-300">Documentation</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="bg-slate-800 text-slate-300 hover:bg-slate-700">
                     {data.ai_analysis.breakdown.documentation.status}
                   </Badge>
                   <span className={`font-semibold ${getScoreColor(data.ai_analysis.breakdown.documentation.score)}`}>
@@ -184,21 +184,21 @@ export function AIComplianceAnalysis({
                   </span>
                 </div>
               </div>
-              <Progress value={data.ai_analysis.breakdown.documentation.score} className="h-1.5" />
-              <p className="text-sm text-muted-foreground mt-2">
+              <Progress value={data.ai_analysis.breakdown.documentation.score} className="h-1.5 bg-slate-800" />
+              <p className="text-sm text-slate-500 mt-2">
                 {data.ai_analysis.breakdown.documentation.notes}
               </p>
             </div>
 
             {/* Financial */}
-            <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
+            <div className="space-y-2 p-4 bg-slate-950 border border-slate-800 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {getStatusIcon(data.ai_analysis.breakdown.financial.status)}
-                  <span className="font-medium">Financial</span>
+                  <span className="font-medium text-slate-300">Financial</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="bg-slate-800 text-slate-300 hover:bg-slate-700">
                     {data.ai_analysis.breakdown.financial.status}
                   </Badge>
                   <span className={`font-semibold ${getScoreColor(data.ai_analysis.breakdown.financial.score)}`}>
@@ -206,21 +206,21 @@ export function AIComplianceAnalysis({
                   </span>
                 </div>
               </div>
-              <Progress value={data.ai_analysis.breakdown.financial.score} className="h-1.5" />
-              <p className="text-sm text-muted-foreground mt-2">
+              <Progress value={data.ai_analysis.breakdown.financial.score} className="h-1.5 bg-slate-800" />
+              <p className="text-sm text-slate-500 mt-2">
                 {data.ai_analysis.breakdown.financial.notes}
               </p>
             </div>
 
             {/* Technical */}
-            <div className="space-y-2 p-4 bg-slate-50 rounded-lg">
+            <div className="space-y-2 p-4 bg-slate-950 border border-slate-800 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   {getStatusIcon(data.ai_analysis.breakdown.technical.status)}
-                  <span className="font-medium">Technical</span>
+                  <span className="font-medium text-slate-300">Technical</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className="bg-slate-800 text-slate-300 hover:bg-slate-700">
                     {data.ai_analysis.breakdown.technical.status}
                   </Badge>
                   <span className={`font-semibold ${getScoreColor(data.ai_analysis.breakdown.technical.score)}`}>
@@ -228,8 +228,8 @@ export function AIComplianceAnalysis({
                   </span>
                 </div>
               </div>
-              <Progress value={data.ai_analysis.breakdown.technical.score} className="h-1.5" />
-              <p className="text-sm text-muted-foreground mt-2">
+              <Progress value={data.ai_analysis.breakdown.technical.score} className="h-1.5 bg-slate-800" />
+              <p className="text-sm text-slate-500 mt-2">
                 {data.ai_analysis.breakdown.technical.notes}
               </p>
             </div>
@@ -238,21 +238,21 @@ export function AIComplianceAnalysis({
 
         {/* Recommendation */}
         {data.ai_analysis.total_score >= 80 ? (
-          <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5" />
+          <div className="flex items-start gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 mt-0.5" />
             <div>
-              <p className="font-semibold text-emerald-900">Bid Eligible</p>
-              <p className="text-sm text-emerald-700 mt-1">
+              <p className="font-semibold text-emerald-400">Bid Eligible</p>
+              <p className="text-sm text-emerald-500/70 mt-1">
                 Your compliance score meets the minimum requirements. You can proceed with bid submission.
               </p>
             </div>
           </div>
         ) : (
-          <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+          <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+            <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
             <div>
-              <p className="font-semibold text-amber-900">Action Required</p>
-              <p className="text-sm text-amber-700 mt-1">
+              <p className="font-semibold text-amber-400">Action Required</p>
+              <p className="text-sm text-amber-500/70 mt-1">
                 Your compliance score is below the minimum threshold. Please update your documentation and improve financial indicators before submitting.
               </p>
             </div>

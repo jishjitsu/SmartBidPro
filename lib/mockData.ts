@@ -265,7 +265,7 @@ export const getBidderStats = () => {
   return {
     activeBids: Math.floor(Math.random() * 5) + 2,
     winRate: Math.floor(Math.random() * 30) + 40,
-    pendingClarifications: Math.floor(Math.random() * 3),
+    pendingClarifications: Math.floor(Math.random() * 2) + 1, // Always 1 or 2
     bidsDueThisWeek: Math.floor(Math.random() * 2) + 1,
     draftBids: Math.floor(Math.random() * 2) + 1,
     avgComplianceScore: Math.floor(Math.random() * 15) + 78,

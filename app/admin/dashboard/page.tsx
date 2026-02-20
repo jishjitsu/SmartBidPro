@@ -8,12 +8,135 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
-import { getAdminStats, getMockBidders, getActivityFeed, BidData, ActivityItem } from "@/lib/mockData"
+import { getAdminStats, getActivityFeed, BidData, ActivityItem } from "@/lib/mockData"
 import {
-  BarChart3, TrendingUp, Users, Award, Eye, Edit, Trash2,
+  BarChart3, TrendingUp, Users, Award, Eye, EyeOff, Edit, Trash2,
   Activity, DollarSign, UserPlus, AlertTriangle, CheckCircle2,
-  Clock, ShieldAlert, Zap, FileText, Bell,
+  Clock, ShieldAlert, Zap, FileText, Bell, Building2, Laptop, Briefcase,
+  HeartPulse, GraduationCap, Truck, Shield, Sprout, Zap as Energy,
+  Factory, Users as Consulting, HardHat, Wrench, Package,
 } from "lucide-react"
+
+// Comprehensive Category Configuration
+const CATEGORY_CONFIG = {
+  construction: {
+    label: "Construction",
+    icon: Building2,
+    color: "text-orange-400",
+    bgColor: "bg-orange-500/10",
+    borderColor: "border-orange-500/30",
+    badgeColor: "bg-orange-500/15 text-orange-300 border-orange-500/25"
+  },
+  it_services: {
+    label: "IT Services",
+    icon: Laptop,
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/10",
+    borderColor: "border-blue-500/30",
+    badgeColor: "bg-blue-500/15 text-blue-300 border-blue-500/25"
+  },
+  healthcare: {
+    label: "Healthcare",
+    icon: HeartPulse,
+    color: "text-rose-400",
+    bgColor: "bg-rose-500/10",
+    borderColor: "border-rose-500/30",
+    badgeColor: "bg-rose-500/15 text-rose-300 border-rose-500/25"
+  },
+  education: {
+    label: "Education",
+    icon: GraduationCap,
+    color: "text-purple-400",
+    bgColor: "bg-purple-500/10",
+    borderColor: "border-purple-500/30",
+    badgeColor: "bg-purple-500/15 text-purple-300 border-purple-500/25"
+  },
+  transportation: {
+    label: "Transportation",
+    icon: Truck,
+    color: "text-green-400",
+    bgColor: "bg-green-500/10",
+    borderColor: "border-green-500/30",
+    badgeColor: "bg-green-500/15 text-green-300 border-green-500/25"
+  },
+  defense: {
+    label: "Defense & Security",
+    icon: Shield,
+    color: "text-red-400",
+    bgColor: "bg-red-500/10",
+    borderColor: "border-red-500/30",
+    badgeColor: "bg-red-500/15 text-red-300 border-red-500/25"
+  },
+  agriculture: {
+    label: "Agriculture",
+    icon: Sprout,
+    color: "text-lime-400",
+    bgColor: "bg-lime-500/10",
+    borderColor: "border-lime-500/30",
+    badgeColor: "bg-lime-500/15 text-lime-300 border-lime-500/25"
+  },
+  energy: {
+    label: "Energy & Utilities",
+    icon: Energy,
+    color: "text-yellow-400",
+    bgColor: "bg-yellow-500/10",
+    borderColor: "border-yellow-500/30",
+    badgeColor: "bg-yellow-500/15 text-yellow-300 border-yellow-500/25"
+  },
+  manufacturing: {
+    label: "Manufacturing",
+    icon: Factory,
+    color: "text-indigo-400",
+    bgColor: "bg-indigo-500/10",
+    borderColor: "border-indigo-500/30",
+    badgeColor: "bg-indigo-500/15 text-indigo-300 border-indigo-500/25"
+  },
+  consulting: {
+    label: "Consulting Services",
+    icon: Consulting,
+    color: "text-teal-400",
+    bgColor: "bg-teal-500/10",
+    borderColor: "border-teal-500/30",
+    badgeColor: "bg-teal-500/15 text-teal-300 border-teal-500/25"
+  },
+  infrastructure: {
+    label: "Infrastructure",
+    icon: HardHat,
+    color: "text-amber-400",
+    bgColor: "bg-amber-500/10",
+    borderColor: "border-amber-500/30",
+    badgeColor: "bg-amber-500/15 text-amber-300 border-amber-500/25"
+  },
+  maintenance: {
+    label: "Maintenance & Repair",
+    icon: Wrench,
+    color: "text-cyan-400",
+    bgColor: "bg-cyan-500/10",
+    borderColor: "border-cyan-500/30",
+    badgeColor: "bg-cyan-500/15 text-cyan-300 border-cyan-500/25"
+  },
+  supplies: {
+    label: "Supplies & Equipment",
+    icon: Package,
+    color: "text-pink-400",
+    bgColor: "bg-pink-500/10",
+    borderColor: "border-pink-500/30",
+    badgeColor: "bg-pink-500/15 text-pink-300 border-pink-500/25"
+  },
+  general: {
+    label: "General Procurement",
+    icon: Briefcase,
+    color: "text-slate-400",
+    bgColor: "bg-slate-500/10",
+    borderColor: "border-slate-500/30",
+    badgeColor: "bg-slate-500/15 text-slate-300 border-slate-500/25"
+  }
+} as const
+
+type CategoryKey = keyof typeof CATEGORY_CONFIG
+
+// Currency conversion rate (USD to INR)
+const USD_TO_INR = 82.5
 
 interface Auction {
   id: string
@@ -24,6 +147,7 @@ interface Auction {
   start_date: string
   end_date: string
   minimum_bid: number
+  category?: string
   created_at: string
   updated_at: string
 }
@@ -76,7 +200,14 @@ export default function AdminDashboardPage() {
       }
 
       const data = await response.json()
-      setAuctions(data)
+      console.log("Raw auction data:", data[0]) // Debug log
+      // Map MongoDB _id to id field
+      const mappedData = data.map((auction: any) => ({
+        ...auction,
+        id: auction._id || auction.id
+      }))
+      console.log("Mapped auction data:", mappedData[0]) // Debug log
+      setAuctions(mappedData)
     } catch (error) {
       console.error("Error fetching auctions:", error)
     } finally {
@@ -90,9 +221,144 @@ export default function AdminDashboardPage() {
     router.push("/login")
   }
 
-  const handleViewBids = (tenderId: string) => {
-    setSelectedTender(tenderId)
-    setBidders(getMockBidders(tenderId, Math.floor(Math.random() * 5) + 3))
+  const handleViewBids = async (tenderId: string) => {
+    console.log("View bids for tender ID:", tenderId) // Debug log
+    if (!tenderId) {
+      console.error("Tender ID is undefined")
+      return
+    }
+    // Toggle view - if already selected, collapse it
+    if (selectedTender === tenderId) {
+      setSelectedTender(null)
+      setBidders([])
+    } else {
+      setSelectedTender(tenderId)
+      
+      // Fetch real bids from API
+      try {
+        const token = localStorage.getItem("token")
+        if (!token) {
+          console.error("No auth token found")
+          return
+        }
+
+        const response = await fetch(`http://localhost:8000/api/admin/tenders/${tenderId}/bids`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        })
+
+        if (!response.ok) {
+          console.error("Failed to fetch bids:", response.statusText)
+          setBidders([])
+          return
+        }
+
+        const bids = await response.json()
+        
+        // Map backend bids to frontend BidData format
+        const mappedBids: BidData[] = bids.map((bid: any) => ({
+          id: bid.id || bid._id,
+          bidder_name: bid.vendor_name,
+          bidder_company: bid.vendor_company,
+          bid_amount: bid.bid_amount,
+          compliance_score: bid.compliance_analysis?.total_score || 0,
+          risk_level: bid.compliance_analysis?.risk_level || "Medium",
+          submitted_at: bid.created_at,
+          status: bid.status === "Applied" ? "Pending" : bid.status === "Awarded" ? "Accepted" : "Rejected",
+        }))
+
+        setBidders(mappedBids)
+      } catch (error) {
+        console.error("Error fetching bids:", error)
+        setBidders([])
+      }
+    }
+  }
+
+  const handleDeleteTender = async (tenderId: string) => {
+    console.log("Delete tender ID:", tenderId) // Debug log
+    if (!tenderId) {
+      alert("Error: Tender ID is missing")
+      return
+    }
+    
+    if (!confirm("Are you sure you want to delete this tender? This action cannot be undone.")) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://localhost:8000/api/auctions/${tenderId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete tender")
+      }
+
+      // Refresh auctions list
+      fetchAuctions(token!)
+    } catch (error) {
+      console.error("Error deleting tender:", error)
+      alert("Failed to delete tender")
+    }
+  }
+
+  const handleEditTender = (tenderId: string) => {
+    console.log("Edit tender ID:", tenderId) // Debug log
+    if (!tenderId) {
+      alert("Error: Tender ID is missing")
+      return
+    }
+    router.push(`/admin/edit-tender/${tenderId}`)
+  }
+
+  const handleAwardBid = async (bidId: string, bidderName: string, tenderId: string) => {
+    if (!bidId) {
+      alert("Error: Bid ID is missing")
+      return
+    }
+
+    if (!confirm(`Are you sure you want to award the tender to ${bidderName}? This will reject all other bids.`)) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) {
+        alert("Authentication required")
+        return
+      }
+
+      const response = await fetch(`http://localhost:8000/api/admin/bids/${bidId}/award`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Failed to award bid:", errorText)
+        alert("Failed to award bid. Please try again.")
+        return
+      }
+
+      alert(`Tender awarded to ${bidderName} successfully!`)
+      
+      // Refresh the tender list and bids
+      await fetchAuctions()
+      if (selectedTender) {
+        handleViewBids(tenderId)
+      }
+    } catch (error) {
+      console.error("Error awarding bid:", error)
+      alert("An error occurred while awarding the bid.")
+    }
   }
 
   const stats = getAdminStats(auctions)
@@ -199,9 +465,9 @@ export default function AdminDashboardPage() {
           <Card className="bg-slate-900 border-slate-800 shadow-[0_10px_15px_-3px_rgba(0,0,0,0.3)]">
             <CardHeader className="pb-2">
               <CardDescription className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total Tender Value</CardDescription>
-              <CardTitle className="text-4xl font-black text-white leading-none mt-1">
+              <CardTitle className="text-5xl font-black text-white leading-none mt-1">
                 {stats.totalValue > 0
-                  ? `$${(stats.totalValue / 1000).toFixed(0)}k`
+                  ? `₹${((stats.totalValue * USD_TO_INR) / 1000).toFixed(0)}k`
                   : <span className="text-2xl text-slate-500">No data</span>}
               </CardTitle>
             </CardHeader>
@@ -264,117 +530,159 @@ export default function AdminDashboardPage() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {auctions.map((auction) => (
-                  <Card key={auction.id} className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3)]">
-                    <CardHeader className="pb-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-1.5">
-                            <CardTitle className="text-base font-semibold text-white truncate">{auction.title}</CardTitle>
-                            <span
-                              className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
-                                auction.status === "Open"
-                                  ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                  : auction.status === "Awarded"
-                                  ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                  : "bg-slate-700/50 text-slate-400 border-slate-600"
-                              }`}
-                            >
-                              {auction.status === "Awarded" ? (
-                                <><CheckCircle2 className="h-3 w-3 mr-1" /> Awarded</>
-                              ) : auction.status === "Open" ? (
-                                <><Activity className="h-3 w-3 mr-1" /> Open</>
-                              ) : (
-                                auction.status
-                              )}
-                            </span>
-                          </div>
-                          <CardDescription className="text-slate-500 text-sm line-clamp-1">
-                            {auction.description}
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-1 ml-3 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-slate-400 hover:text-white hover:bg-slate-800 text-xs px-2"
-                            onClick={() => handleViewBids(auction.id)}
-                          >
-                            <Eye className="h-3.5 w-3.5 mr-1" /> Bids
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-800 p-2">
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-500/70 hover:text-red-400 hover:bg-slate-800 p-2">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-4 text-xs">
-                        <div>
-                          <p className="text-slate-500 mb-0.5">Min. Bid</p>
-                          <p className="font-bold text-white">${auction.minimum_bid.toLocaleString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500 mb-0.5">Start Date</p>
-                          <p className="text-slate-300">{new Date(auction.start_date).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500 mb-0.5">End Date</p>
-                          <p className="text-slate-300">{new Date(auction.end_date).toLocaleDateString()}</p>
-                        </div>
-                      </div>
+                {auctions.map((auction) => {
+                  const category = (auction.category || 'general') as CategoryKey
+                  const categoryConfig = CATEGORY_CONFIG[category]
+                  const CategoryIcon = categoryConfig.icon
+                  const isExpanded = selectedTender === auction.id
 
-                      {/* Bidders Panel */}
-                      {selectedTender === auction.id && bidders.length > 0 && (
-                        <div className="mt-5 pt-5 border-t border-slate-800">
-                          <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                            <Users className="h-4 w-4 text-blue-400" />
-                            Active Bidders
-                            <span className="ml-auto text-xs text-slate-500">{bidders.length} submissions</span>
-                          </h4>
-                          <div className="space-y-2.5">
-                            {bidders.map((bidder) => (
-                              <div key={bidder.id} className="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
-                                <div className="flex-1 min-w-0 mr-4">
-                                  <p className="text-sm font-medium text-white truncate">{bidder.bidder_company}</p>
-                                  <p className="text-xs text-slate-400">{bidder.bidder_name}</p>
-                                </div>
-                                <div className="flex items-center gap-4 shrink-0">
-                                  <div className="text-right">
-                                    <p className="text-xs text-slate-500">Amount</p>
-                                    <p className="text-sm font-bold text-white">${bidder.bid_amount.toLocaleString()}</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="text-xs text-slate-500">Compliance</p>
-                                    <p className={`text-sm font-bold ${
-                                      bidder.compliance_score >= 85 ? "text-emerald-400" :
-                                      bidder.compliance_score >= 70 ? "text-amber-400" : "text-red-400"
-                                    }`}>{bidder.compliance_score}%</p>
-                                  </div>
-                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-                                    bidder.risk_level === "Low"
-                                      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-                                      : bidder.risk_level === "Medium"
-                                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                      : "bg-red-500/10 text-red-400 border-red-500/20"
-                                  }`}>
-                                    {bidder.risk_level}
-                                  </span>
-                                  <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-xs h-7 px-3">
-                                    Award
-                                  </Button>
-                                </div>
-                              </div>
-                            ))}
+                  return (
+                    <Card key={auction.id} className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors shadow-[0_4px_6px_-1px_rgba(0,0,0,0.3)]">
+                      <CardHeader className="pb-3">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <CardTitle className="text-base font-semibold text-white truncate">{auction.title}</CardTitle>
+                              
+                              {/* Category Badge */}
+                              <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${categoryConfig.badgeColor}`}>
+                                <CategoryIcon className="h-3 w-3 mr-1" />
+                                {categoryConfig.label}
+                              </span>
+                              
+                              {/* Status Badge */}
+                              <span
+                                className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
+                                  auction.status === "Open"
+                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                    : auction.status === "Awarded"
+                                    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                    : "bg-slate-700/50 text-slate-400 border-slate-600"
+                                }`}
+                              >
+                                {auction.status === "Awarded" ? (
+                                  <><CheckCircle2 className="h-3 w-3 mr-1" /> Awarded</>
+                                ) : auction.status === "Open" ? (
+                                  <><Activity className="h-3 w-3 mr-1" /> Open</>
+                                ) : (
+                                  auction.status
+                                )}
+                              </span>
+                            </div>
+                            <CardDescription className="text-slate-500 text-sm line-clamp-1">
+                              {auction.description}
+                            </CardDescription>
+                          </div>
+                          <div className="flex gap-1 ml-3 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-slate-400 hover:text-white hover:bg-slate-800 text-xs px-2"
+                              onClick={() => handleViewBids(auction.id)}
+                            >
+                              {isExpanded ? (
+                                <><EyeOff className="h-3.5 w-3.5 mr-1" /> Hide</>
+                              ) : (
+                                <><Eye className="h-3.5 w-3.5 mr-1" /> Bids</>
+                              )}
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-slate-400 hover:text-white hover:bg-slate-800 p-2"
+                              onClick={() => handleEditTender(auction.id)}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-red-500/70 hover:text-red-400 hover:bg-slate-800 p-2"
+                              onClick={() => handleDeleteTender(auction.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
                           </div>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-3 gap-4 text-xs">
+                          <div>
+                            <p className="text-slate-500 mb-0.5">Min. Bid</p>
+                            <p className="font-bold text-white">₹{(auction.minimum_bid * USD_TO_INR).toLocaleString('en-IN')}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500 mb-0.5">Start Date</p>
+                            <p className="text-slate-300">{new Date(auction.start_date).toLocaleDateString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500 mb-0.5">End Date</p>
+                            <p className="text-slate-300">{new Date(auction.end_date).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+
+                        {/* Bidders Panel - Only show when expanded */}
+                        {isExpanded && (
+                          <div className="mt-5 pt-5 border-t border-slate-800">
+                            {bidders.length === 0 ? (
+                              <div className="text-center py-8">
+                                <p className="text-sm text-slate-500">No bids yet</p>
+                              </div>
+                            ) : (
+                              <>
+                                <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                                  <Users className="h-4 w-4 text-blue-400" />
+                                  Active Bidders
+                                  <span className="ml-auto text-xs text-slate-500">{bidders.length} submissions</span>
+                                </h4>
+                                <div className="space-y-2.5">
+                                  {bidders.map((bidder) => (
+                                    <div key={bidder.id} className="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
+                                      <div className="flex-1 min-w-0 mr-4">
+                                        <p className="text-sm font-medium text-white truncate">{bidder.bidder_company}</p>
+                                        <p className="text-xs text-slate-400">{bidder.bidder_name}</p>
+                                      </div>
+                                      <div className="flex items-center gap-4 shrink-0">
+                                        <div className="text-right">
+                                          <p className="text-xs text-slate-500">Amount</p>
+                                          <p className="text-sm font-bold text-white">₹{(bidder.bid_amount * USD_TO_INR).toLocaleString('en-IN')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-xs text-slate-500">Compliance</p>
+                                          <p className={`text-sm font-bold ${
+                                            bidder.compliance_score >= 85 ? "text-emerald-400" :
+                                            bidder.compliance_score >= 70 ? "text-amber-400" : "text-red-400"
+                                          }`}>{bidder.compliance_score}%</p>
+                                        </div>
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
+                                          bidder.risk_level === "Low"
+                                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                            : bidder.risk_level === "Medium"
+                                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                            : "bg-red-500/10 text-red-400 border-red-500/20"
+                                        }`}>
+                                          {bidder.risk_level}
+                                        </span>
+                                        <Button 
+                                          size="sm" 
+                                          className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-xs h-7 px-3"
+                                          onClick={() => handleAwardBid(bidder.id, bidder.bidder_name, auction.id)}
+                                          disabled={bidder.status === "Accepted" || bidder.status === "Rejected"}
+                                        >
+                                          {bidder.status === "Accepted" ? "Awarded" : bidder.status === "Rejected" ? "Rejected" : "Award"}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             )}
           </div>
