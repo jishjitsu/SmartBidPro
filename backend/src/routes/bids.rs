@@ -1,47 +1,42 @@
 use crate::auth::AuthenticatedUser;
+use crate::errors::AppError;
 use crate::models::{AuctionStatus, Bid, BidStatus, CreateBidRequest, UserRole};
+use crate::state::AppState;
+use actix_web::{HttpResponse, web};
 use chrono::Utc;
 use futures::stream::TryStreamExt;
 use mongodb::bson::{self, doc, oid::ObjectId, Document};
-use mongodb::Database;
-use rocket::http::Status;
-use rocket::serde::json::Json;
-use rocket::State;
 
-#[post("/tenders/<tender_id>/apply", format = "json", data = "<bid_data>")]
 pub async fn apply_to_tender(
-    tender_id: String,
-    bid_data: Json<CreateBidRequest>,
+    tender_id: web::Path<String>,
+    bid_data: web::Json<CreateBidRequest>,
     user: AuthenticatedUser,
-    db: &State<Database>,
-) -> Result<Json<Bid>, Status> {
-    // Only vendors can apply
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let tender_id = tender_id.into_inner();
+
     if user.claims.role != UserRole::Vendor {
-        return Err(Status::Forbidden);
+        return Err(AppError::Forbidden);
     }
 
-    // Validate tender_id is a valid ObjectId
     let tender_object_id = match ObjectId::parse_str(&tender_id) {
         Ok(id) => id,
-        Err(_) => return Err(Status::BadRequest),
+        Err(_) => return Err(AppError::BadRequest),
     };
 
-    // Check if tender exists and is open
-    let auctions = db.collection::<Document>("auctions");
+    let auctions = state.db.collection::<Document>("auctions");
     let tender = match auctions.find_one(doc! { "_id": tender_object_id }).await {
         Ok(Some(tender)) => tender,
-        Ok(None) => return Err(Status::NotFound),
-        Err(_) => return Err(Status::InternalServerError),
+        Ok(None) => return Err(AppError::NotFound),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
-    // Verify tender status is "open"
     match tender.get_str("status") {
         Ok(status) if status.eq_ignore_ascii_case("open") => {}
-        _ => return Err(Status::BadRequest),
+        _ => return Err(AppError::BadRequest),
     }
 
-    // Check for duplicate bid from this vendor
-    let bids = db.collection::<Document>("bids");
+    let bids = state.db.collection::<Document>("bids");
     let existing_bid = bids
         .find_one(doc! {
             "tender_id": &tender_id,
@@ -50,24 +45,23 @@ pub async fn apply_to_tender(
         .await;
 
     if let Ok(Some(_)) = existing_bid {
-        return Err(Status::Conflict); // 409 - Vendor already applied
+        return Err(AppError::Conflict);
     }
 
-    // Get vendor info from user
-    let users = db.collection::<Document>("users");
+    let users = state.db.collection::<Document>("users");
+    let user_id = ObjectId::parse_str(&user.claims.sub).map_err(|_| AppError::BadRequest)?;
     let vendor = match users
-        .find_one(doc! { "_id": ObjectId::parse_str(&user.claims.sub).unwrap() })
+        .find_one(doc! { "_id": user_id })
         .await
     {
         Ok(Some(vendor)) => vendor,
-        Ok(None) => return Err(Status::NotFound),
-        Err(_) => return Err(Status::InternalServerError),
+        Ok(None) => return Err(AppError::NotFound),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
     let vendor_name = vendor.get_str("name").unwrap_or("Unknown").to_string();
     let vendor_company = vendor.get_str("company").unwrap_or("").to_string();
 
-    // Create bid document
     let now = Utc::now();
     let bid = Bid {
         id: None,
@@ -86,94 +80,93 @@ pub async fn apply_to_tender(
 
     let bid_doc = match bson::to_document(&bid) {
         Ok(doc) => doc,
-        Err(_) => return Err(Status::InternalServerError),
+        Err(_) => return Err(AppError::InternalError),
     };
 
-    let bids_collection = db.collection::<Document>("bids");
+    let bids_collection = state.db.collection::<Document>("bids");
     let result = bids_collection.insert_one(bid_doc).await;
 
     match result {
         Ok(insert_result) => {
-            let inserted_id = insert_result.inserted_id.as_object_id().unwrap();
+            let inserted_id = insert_result
+                .inserted_id
+                .as_object_id()
+                .ok_or(AppError::InternalError)?;
             let mut created_bid = bid;
             created_bid.id = Some(inserted_id);
-            Ok(Json(created_bid))
+            Ok(HttpResponse::Created().json(created_bid))
         }
-        Err(_) => Err(Status::InternalServerError),
+        Err(e) => Err(AppError::DbError(e)),
     }
 }
 
-#[get("/admin/tenders/<tender_id>/bids")]
 pub async fn get_tender_bids(
-    tender_id: String,
+    tender_id: web::Path<String>,
     user: AuthenticatedUser,
-    db: &State<Database>,
-) -> Result<Json<Vec<Bid>>, Status> {
-    // Only admins can view bids
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let tender_id = tender_id.into_inner();
+
     if user.claims.role != UserRole::Admin {
-        return Err(Status::Forbidden);
+        return Err(AppError::Forbidden);
     }
 
-    let bids = db.collection::<Bid>("bids");
+    let bids = state.db.collection::<Bid>("bids");
 
     let cursor = bids
         .find(doc! { "tender_id": &tender_id })
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(AppError::DbError)?;
 
     let bids_vec: Vec<Bid> = cursor
         .try_collect()
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(|_| AppError::InternalError)?;
 
-    Ok(Json(bids_vec))
+    Ok(HttpResponse::Ok().json(bids_vec))
 }
 
-#[post("/admin/bids/<bid_id>/award")]
 pub async fn award_bid(
-    bid_id: String,
+    bid_id: web::Path<String>,
     user: AuthenticatedUser,
-    db: &State<Database>,
-) -> Result<Json<Bid>, Status> {
-    // Only admins can award bids
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
+    let bid_id = bid_id.into_inner();
+
     if user.claims.role != UserRole::Admin {
-        return Err(Status::Forbidden);
+        return Err(AppError::Forbidden);
     }
 
-    // Validate bid_id is a valid ObjectId
     let bid_object_id = match ObjectId::parse_str(&bid_id) {
         Ok(id) => id,
-        Err(_) => return Err(Status::BadRequest),
+        Err(_) => return Err(AppError::BadRequest),
     };
 
-    let bids = db.collection::<Bid>("bids");
+    let bids = state.db.collection::<Bid>("bids");
 
-    // Get the bid to be awarded
     let bid = match bids.find_one(doc! { "_id": bid_object_id }).await {
         Ok(Some(bid)) => bid,
-        Ok(None) => return Err(Status::NotFound),
-        Err(_) => return Err(Status::InternalServerError),
+        Ok(None) => return Err(AppError::NotFound),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
-    // Update this bid to Awarded
     let now = Utc::now();
     match bids
         .update_one(
             doc! { "_id": bid_object_id },
             doc! {
                 "$set": {
-                    "status": bson::to_bson(&BidStatus::Awarded).unwrap(),
-                    "updated_at": bson::to_bson(&now).unwrap()
+                    "status": bson::to_bson(&BidStatus::Awarded).map_err(|_| AppError::InternalError)?,
+                    "updated_at": bson::to_bson(&now).map_err(|_| AppError::InternalError)?
                 }
             },
         )
         .await
     {
         Ok(_) => {}
-        Err(_) => return Err(Status::InternalServerError),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
-    // Reject all other bids for the same tender
     match bids
         .update_many(
             doc! {
@@ -182,22 +175,21 @@ pub async fn award_bid(
             },
             doc! {
                 "$set": {
-                    "status": bson::to_bson(&BidStatus::Rejected).unwrap(),
-                    "updated_at": bson::to_bson(&now).unwrap()
+                    "status": bson::to_bson(&BidStatus::Rejected).map_err(|_| AppError::InternalError)?,
+                    "updated_at": bson::to_bson(&now).map_err(|_| AppError::InternalError)?
                 }
             },
         )
         .await
     {
         Ok(_) => {}
-        Err(_) => return Err(Status::InternalServerError),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
-    // Update tender status to "awarded"
-    let auctions = db.collection::<Document>("auctions");
+    let auctions = state.db.collection::<Document>("auctions");
     let tender_object_id = match ObjectId::parse_str(&bid.tender_id) {
         Ok(id) => id,
-        Err(_) => return Err(Status::BadRequest),
+        Err(_) => return Err(AppError::BadRequest),
     };
 
     match auctions
@@ -205,48 +197,45 @@ pub async fn award_bid(
             doc! { "_id": tender_object_id },
             doc! {
                 "$set": {
-                    "status": bson::to_bson(&AuctionStatus::Awarded).unwrap(),
-                    "updated_at": bson::to_bson(&now).unwrap()
+                    "status": bson::to_bson(&AuctionStatus::Awarded).map_err(|_| AppError::InternalError)?,
+                    "updated_at": bson::to_bson(&now).map_err(|_| AppError::InternalError)?
                 }
             },
         )
         .await
     {
         Ok(_) => {}
-        Err(_) => return Err(Status::InternalServerError),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
-    // Return the updated awarded bid
     let awarded_bid = match bids.find_one(doc! { "_id": bid_object_id }).await {
         Ok(Some(bid)) => bid,
-        Ok(None) => return Err(Status::NotFound),
-        Err(_) => return Err(Status::InternalServerError),
+        Ok(None) => return Err(AppError::NotFound),
+        Err(e) => return Err(AppError::DbError(e)),
     };
 
-    Ok(Json(awarded_bid))
+    Ok(HttpResponse::Ok().json(awarded_bid))
 }
 
-#[get("/vendor/bids")]
 pub async fn get_vendor_bids(
     user: AuthenticatedUser,
-    db: &State<Database>,
-) -> Result<Json<Vec<Bid>>, Status> {
-    // Only vendors can view their own bids
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, AppError> {
     if user.claims.role != UserRole::Vendor {
-        return Err(Status::Forbidden);
+        return Err(AppError::Forbidden);
     }
 
-    let bids = db.collection::<Bid>("bids");
+    let bids = state.db.collection::<Bid>("bids");
 
     let cursor = bids
         .find(doc! { "vendor_id": &user.claims.sub })
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(AppError::DbError)?;
 
     let bids_vec: Vec<Bid> = cursor
         .try_collect()
         .await
-        .map_err(|_| Status::InternalServerError)?;
+        .map_err(|_| AppError::InternalError)?;
 
-    Ok(Json(bids_vec))
+    Ok(HttpResponse::Ok().json(bids_vec))
 }

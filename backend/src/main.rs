@@ -1,63 +1,68 @@
-#[macro_use]
-extern crate rocket;
-
 mod auth;
-mod db;
+mod errors;
 mod models;
 mod routes;
+mod state;
 
-use rocket::http::Method;
-use rocket_cors::{AllowedOrigins, AllowedHeaders, CorsOptions};
+use actix_cors::Cors;
+use actix_web::{App, HttpResponse, HttpServer, middleware::Logger, web};
+use mongodb::Client;
 
-#[get("/")]
-fn index() -> &'static str {
-    "SmartBid-PRO API v1.0"
+async fn index() -> HttpResponse {
+    HttpResponse::Ok().body("SmartBid-PRO API v1.0")
 }
 
-#[get("/health")]
-fn health() -> &'static str {
-    "OK"
+async fn health() -> HttpResponse {
+    HttpResponse::Ok().body("OK")
 }
 
-#[launch]
-async fn rocket() -> _ {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
-    
-    let database = db::init_db()
+
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+
+    let mongodb_uri = std::env::var("MONGODB_URI")
+        .unwrap_or_else(|_| "mongodb://localhost:27017".to_string());
+    let database_name = std::env::var("DATABASE_NAME")
+        .unwrap_or_else(|_| "smartbidpro".to_string());
+
+    let client = Client::with_uri_str(&mongodb_uri)
         .await
         .expect("Failed to connect to database");
-    
-    // Configure CORS
-    let cors = CorsOptions::default()
-        .allowed_origins(AllowedOrigins::all())
-        .allowed_methods(
-            vec![Method::Get, Method::Post, Method::Put, Method::Delete, Method::Options]
-                .into_iter()
-                .map(From::from)
-                .collect(),
-        )
-        .allowed_headers(AllowedHeaders::some(&["Authorization", "Content-Type", "Accept"]))
-        .allow_credentials(true)
-        .to_cors()
-        .expect("Error creating CORS fairing");
-    
-    rocket::build()
-        .manage(database)
-        .attach(cors)
-        .mount("/", routes![index, health])
-        .mount("/api/auth", routes![
-            routes::auth::register,
-            routes::auth::login,
-        ])
-        .mount("/api", routes![
-            routes::auctions::get_auctions,
-            routes::auctions::get_auction,
-            routes::auctions::create_auction,
-            routes::auctions::update_auction,
-            routes::auctions::delete_auction,
-            routes::bids::apply_to_tender,
-            routes::bids::get_tender_bids,
-            routes::bids::award_bid,
-            routes::bids::get_vendor_bids,
-        ])
+
+    let app_state = state::AppState {
+        db: client.database(&database_name),
+    };
+
+    HttpServer::new(move || {
+        let cors = Cors::permissive();
+
+        App::new()
+            .app_data(web::Data::new(app_state.clone()))
+            .wrap(Logger::default())
+            .wrap(cors)
+            .route("/", web::get().to(index))
+            .route("/health", web::get().to(health))
+            .service(
+                web::scope("/api/auth")
+                    .route("/register", web::post().to(routes::auth::register))
+                    .route("/login", web::post().to(routes::auth::login)),
+            )
+            .service(
+                web::scope("/api")
+                    .route("/auctions", web::get().to(routes::auctions::get_auctions))
+                    .route("/auctions/{id}", web::get().to(routes::auctions::get_auction))
+                    .route("/auctions", web::post().to(routes::auctions::create_auction))
+                    .route("/auctions/{id}", web::put().to(routes::auctions::update_auction))
+                    .route("/auctions/{id}", web::delete().to(routes::auctions::delete_auction))
+                    .route("/tenders/{tender_id}/apply", web::post().to(routes::bids::apply_to_tender))
+                    .route("/admin/tenders/{tender_id}/bids", web::get().to(routes::bids::get_tender_bids))
+                    .route("/admin/bids/{bid_id}/award", web::post().to(routes::bids::award_bid))
+                    .route("/vendor/bids", web::get().to(routes::bids::get_vendor_bids)),
+            )
+    })
+    .bind(("0.0.0.0", 8000))?
+    .run()
+    .await
 }

@@ -1,6 +1,6 @@
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use rocket::http::Status;
-use rocket::request::{FromRequest, Outcome, Request};
+use actix_web::{FromRequest, HttpRequest, dev::Payload, error::ErrorUnauthorized};
+use futures::future::{Ready, ready};
 use std::env;
 use crate::models::{Claims, UserRole};
 
@@ -42,47 +42,23 @@ pub struct AuthenticatedUser {
     pub claims: Claims,
 }
 
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for AuthenticatedUser {
-    type Error = ();
+impl FromRequest for AuthenticatedUser {
+    type Error = actix_web::Error;
+    type Future = Ready<Result<Self, Self::Error>>;
 
-    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+    fn from_request(request: &HttpRequest, _: &mut Payload) -> Self::Future {
         let token = request
             .headers()
-            .get_one("Authorization")
+            .get("Authorization")
+            .and_then(|header| header.to_str().ok())
             .and_then(|header| header.strip_prefix("Bearer "));
 
         match token {
             Some(token) => match verify_jwt(token) {
-                Ok(claims) => Outcome::Success(AuthenticatedUser { claims }),
-                Err(_) => Outcome::Error((Status::Unauthorized, ())),
+                Ok(claims) => ready(Ok(AuthenticatedUser { claims })),
+                Err(_) => ready(Err(ErrorUnauthorized("Unauthorized access"))),
             },
-            None => Outcome::Error((Status::Unauthorized, ())),
-        }
-    }
-}
-
-// Role-based guard
-pub struct AdminUser {
-    pub claims: Claims,
-}
-
-#[rocket::async_trait]
-impl<'r> FromRequest<'r> for AdminUser {
-    type Error = ();
-
-    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        let auth_user = request.guard::<AuthenticatedUser>().await;
-        
-        match auth_user {
-            Outcome::Success(user) => {
-                match user.claims.role {
-                    UserRole::Admin => Outcome::Success(AdminUser { claims: user.claims }),
-                    _ => Outcome::Error((Status::Forbidden, ())),
-                }
-            }
-            Outcome::Error(e) => Outcome::Error(e),
-            Outcome::Forward(f) => Outcome::Forward(f),
+            None => ready(Err(ErrorUnauthorized("Unauthorized access"))),
         }
     }
 }
