@@ -4,7 +4,7 @@ A revolutionary technology aimed to digitise the hassle of tenders through analo
 
 SBP achieves this using a secure smart contract based backend, and an AI validation model which comprehensively checks for compliance of a Certain tender, and regulations to be followed.
 
-Built using Next.js and Rocket(Rust)
+Built using Next.js and Actix Web
 
 ## Tech Stack
 
@@ -15,7 +15,7 @@ Built using Next.js and Rocket(Rust)
 - **TypeScript** - Type-safe development
 
 ### Backend
-- **Rocket (Rust)** - Fast, secure web framework
+- **Actix Web (Rust)** - Fast, secure web framework
 - **MongoDB** - NoSQL database for flexible data storage
 - **JWT Authentication** - Secure token-based auth
 - **bcrypt** - Password hashing
