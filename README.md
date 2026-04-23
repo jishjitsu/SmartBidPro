@@ -65,8 +65,8 @@ cd backend
 ```env
 MONGODB_URI=mongodb://localhost:27017/smartbidpro
 JWT_SECRET=your-secret-key-change-this-in-production
-ROCKET_PORT=8000
-ROCKET_ADDRESS=0.0.0.0
+Actix_PORT=8000
+Actix_ADDRESS=0.0.0.0
 ```
 
 3. Build and run the backend:
@@ -75,7 +75,7 @@ cargo build
 cargo run
 ```
 
-The Rocket server will start on `http://localhost:8000`
+The Actix server will start on `http://localhost:8000`
 z
 ### Frontend Setup
 

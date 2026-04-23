@@ -37,7 +37,7 @@ pub fn verify_jwt(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
     Ok(token_data.claims)
 }
 
-// Rocket request guard for authenticated users
+// Actix request guard for authenticated users
 pub struct AuthenticatedUser {
     pub claims: Claims,
 }

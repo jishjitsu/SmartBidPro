@@ -1,4 +1,5 @@
 use actix_web::{HttpResponse, web};
+use alloy::primitives::B256;
 use crate::models::{Auction, CreateAuctionRequest, UpdateAuctionRequest};
 use crate::auth::AuthenticatedUser;
 use crate::errors::AppError;
@@ -6,6 +7,17 @@ use crate::state::AppState;
 use mongodb::bson::{self, doc, oid::ObjectId};
 use chrono::Utc;
 use futures::stream::TryStreamExt;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+pub struct NotarizeRequest {
+    pub data_hash: String,
+}
+
+#[derive(Serialize)]
+pub struct NotarizeResponse {
+    pub tx_hash: String,
+}
 
 pub async fn get_auctions(
     state: web::Data<AppState>,
@@ -158,4 +170,26 @@ pub async fn delete_auction(
         .map_err(AppError::DbError)?;
     
     Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn notarize_auction(
+    state: web::Data<AppState>,
+    _user: AuthenticatedUser,
+    _id: web::Path<String>,
+    payload: web::Json<NotarizeRequest>,
+) -> Result<HttpResponse, AppError> {
+    let data_hash = payload
+        .data_hash
+        .parse::<B256>()
+        .map_err(|_| AppError::BadRequest)?;
+
+    let tx_hash = state
+        .blockchain
+        .notarize_hash(data_hash)
+        .await
+        .map_err(|_| AppError::InternalError)?;
+
+    Ok(HttpResponse::Ok().json(NotarizeResponse {
+        tx_hash: tx_hash.to_string(),
+    }))
 }
