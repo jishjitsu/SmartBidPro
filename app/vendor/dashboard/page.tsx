@@ -17,6 +17,8 @@ import {
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 
+const USD_TO_INR = 82.5
+
 interface VendorBid {
   id: string
   tender_id: string
@@ -199,7 +201,7 @@ function TenderCard({ auction, onApply, onViewDetails }: { auction: Auction; onA
         <div className={`flex justify-between items-center py-2 px-3 ${accentBg} rounded-lg`}>
           <span className="text-xs font-medium text-slate-400">Minimum Bid</span>
           <span className={`font-bold ${accentText}`}>
-            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(auction.minimum_bid)}
+            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(auction.minimum_bid * USD_TO_INR)}
           </span>
         </div>
         <div className="flex justify-between items-center text-sm">
@@ -269,7 +271,8 @@ function UnifiedVendorView({
       }
 
       const bids = await response.json()
-      setMyBids(bids)
+      const mappedBids = bids.map((b: any) => ({ ...b, id: b._id || b.id }))
+      setMyBids(mappedBids)
     } catch (error) {
       console.error("Error fetching bids:", error)
     } finally {
@@ -555,7 +558,7 @@ function UnifiedVendorView({
                         <div>
                           <p className="text-xs text-slate-500">Bid Amount</p>
                           <p className="text-lg font-bold text-indigo-400">
-                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bid.bid_amount)}
+                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(bid.bid_amount * USD_TO_INR)}
                           </p>
                         </div>
                         {bid.compliance_analysis && (
@@ -625,7 +628,7 @@ function UnifiedVendorView({
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-slate-300">Minimum Bid Required</span>
                 <span className="text-xl font-bold text-indigo-400">
-                  {selectedAuction && new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedAuction.minimum_bid)}
+                  {selectedAuction && new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(selectedAuction.minimum_bid * USD_TO_INR)}
                 </span>
               </div>
             </div>

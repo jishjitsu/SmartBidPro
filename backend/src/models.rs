@@ -19,6 +19,7 @@ pub enum UserRole {
     Admin,
     Vendor,
     Auditor,
+    Bidder,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

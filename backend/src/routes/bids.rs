@@ -98,6 +98,32 @@ pub async fn apply_to_tender(
             let mut created_bid = bid;
             created_bid.id = Some(inserted_id);
 
+            // Optional: store private bid details in Hyperledger Fabric (PDC) via gateway.
+            // This keeps sensitive fields available only to authorized org members.
+            if let Ok(gateway_url) = std::env::var("FABRIC_GATEWAY_URL") {
+                if !gateway_url.trim().is_empty() {
+                    let private_payload = serde_json::json!({
+                        "bid_id": inserted_id.to_hex(),
+                        "tender_id": created_bid.tender_id,
+                        "vendor_id": created_bid.vendor_id,
+                        "additional_attributes": {
+                            "bid_amount": created_bid.bid_amount,
+                            "proposal_text": created_bid.proposal_text,
+                            "documents": created_bid.documents,
+                            "compliance_analysis": created_bid.compliance_analysis
+                        }
+                    });
+
+                    let url = format!("{}/private-bids/upsert", gateway_url.trim_end_matches('/'));
+                    let client = reqwest::Client::new();
+
+                    if let Err(e) = client.post(url).json(&private_payload).send().await {
+                        // Don't block bid submission if Fabric is down; log and continue.
+                        eprintln!("[fabric-gateway] upsert failed: {e}");
+                    }
+                }
+            }
+
             let bid_hash_payload = serde_json::json!({
                 "id": created_bid.id.as_ref().map(|oid| oid.to_hex()),
                 "tender_id": created_bid.tender_id,
