@@ -8,6 +8,7 @@ use mongodb::bson::{self, doc, oid::ObjectId};
 use chrono::Utc;
 use futures::stream::TryStreamExt;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 #[derive(Deserialize)]
 pub struct NotarizeRequest {
@@ -90,6 +91,27 @@ pub async fn create_auction(
         id: Some(inserted_id),
         ..new_auction
     };
+
+    let tender_requirements_payload = serde_json::json!({
+        "title": created_auction.title,
+        "description": created_auction.description,
+        "start_date": created_auction.start_date,
+        "end_date": created_auction.end_date,
+        "minimum_bid": created_auction.minimum_bid,
+        "category": created_auction.category,
+        "created_by": created_auction.created_by
+    });
+
+    let requirements_hash_bytes = serde_json::to_vec(&tender_requirements_payload)
+        .map_err(|_| AppError::InternalError)?;
+    let requirements_digest = Sha256::digest(&requirements_hash_bytes);
+    let requirements_hash = B256::from_slice(&requirements_digest);
+
+    state
+        .blockchain
+        .notarize_hash(requirements_hash)
+        .await
+        .map_err(|_| AppError::InternalError)?;
     
     Ok(HttpResponse::Created().json(created_auction))
 }

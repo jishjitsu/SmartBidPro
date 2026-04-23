@@ -3,9 +3,11 @@ use crate::errors::AppError;
 use crate::models::{AuctionStatus, Bid, BidStatus, CreateBidRequest, UserRole};
 use crate::state::AppState;
 use actix_web::{HttpResponse, web};
+use alloy::primitives::B256;
 use chrono::Utc;
 use futures::stream::TryStreamExt;
 use mongodb::bson::{self, doc, oid::ObjectId, Document};
+use sha2::{Digest, Sha256};
 
 pub async fn apply_to_tender(
     tender_id: web::Path<String>,
@@ -92,8 +94,36 @@ pub async fn apply_to_tender(
                 .inserted_id
                 .as_object_id()
                 .ok_or(AppError::InternalError)?;
+
             let mut created_bid = bid;
             created_bid.id = Some(inserted_id);
+
+            let bid_hash_payload = serde_json::json!({
+                "id": created_bid.id.as_ref().map(|oid| oid.to_hex()),
+                "tender_id": created_bid.tender_id,
+                "vendor_id": created_bid.vendor_id,
+                "vendor_name": created_bid.vendor_name,
+                "vendor_company": created_bid.vendor_company,
+                "bid_amount": created_bid.bid_amount,
+                "proposal_text": created_bid.proposal_text,
+                "documents": created_bid.documents,
+                "compliance_analysis": created_bid.compliance_analysis,
+                "status": created_bid.status,
+                "created_at": created_bid.created_at,
+                "updated_at": created_bid.updated_at
+            });
+
+            let bid_hash_bytes = serde_json::to_vec(&bid_hash_payload)
+                .map_err(|_| AppError::InternalError)?;
+            let bid_digest = Sha256::digest(&bid_hash_bytes);
+            let bid_hash = B256::from_slice(&bid_digest);
+
+            state
+                .blockchain
+                .notarize_hash(bid_hash)
+                .await
+                .map_err(|_| AppError::InternalError)?;
+
             Ok(HttpResponse::Created().json(created_bid))
         }
         Err(e) => Err(AppError::DbError(e)),
