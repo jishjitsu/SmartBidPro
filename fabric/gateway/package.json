@@ -9,7 +9,7 @@
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
+    "fabric-ca-client": "^2.2.20",
     "fabric-network": "^2.2.20"
   }
 }
-

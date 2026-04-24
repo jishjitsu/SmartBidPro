@@ -165,7 +165,8 @@ export default function AdminDashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTender, setSelectedTender] = useState<string | null>(null)
-  const [bidders, setBidders] = useState<BidData[]>([])
+  const [revealedBids, setRevealedBids] = useState<Record<string, any>>({})
+  const [isRevealing, setIsRevealing] = useState<string | null>(null)
   const [activityFeed] = useState<ActivityItem[]>(getActivityFeed())
 
   useEffect(() => {
@@ -276,7 +277,26 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const handleDeleteTender = async (tenderId: string) => {
+  const handleRevealBlockchainData = async (bidId: string) => {
+    setIsRevealing(bidId)
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch(`http://localhost:8000/api/bids/${bidId}/private-details`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      })
+      if (!response.ok) throw new Error("Failed to fetch private data")
+      const data = await response.json()
+      
+      // The data from Fabric contains the original values
+      const details = data.details.additional_attributes || data.details
+      setRevealedBids(prev => ({ ...prev, [bidId]: details }))
+    } catch (error) {
+      console.error("Reveal error:", error)
+      alert("Could not verify data via Blockchain Gateway")
+    } finally {
+      setIsRevealing(null)
+    }
+  }
     console.log("Delete tender ID:", tenderId) // Debug log
     if (!tenderId) {
       alert("Error: Tender ID is missing")
@@ -351,7 +371,7 @@ export default function AdminDashboardPage() {
       alert(`Tender awarded to ${bidderName} successfully!`)
       
       // Refresh the tender list and bids
-      await fetchAuctions()
+      await fetchAuctions(token)
       if (selectedTender) {
         handleViewBids(tenderId)
       }
@@ -645,7 +665,25 @@ export default function AdminDashboardPage() {
                                       <div className="flex items-center gap-4 shrink-0">
                                         <div className="text-right">
                                           <p className="text-xs text-slate-500">Amount</p>
-                                          <p className="text-sm font-bold text-white">₹{(bidder.bid_amount * USD_TO_INR).toLocaleString('en-IN')}</p>
+                                          {revealedBids[bidder.id] ? (
+                                            <p className="text-sm font-bold text-amber-400">
+                                              ₹{(revealedBids[bidder.id].bid_amount * USD_TO_INR).toLocaleString('en-IN')}
+                                              <span className="ml-1 text-[10px] text-emerald-500 font-normal">(Verified)</span>
+                                            </p>
+                                          ) : (
+                                            <div className="flex flex-col items-end">
+                                              <p className="text-sm font-bold text-slate-600 line-through">₹0</p>
+                                              <Button 
+                                                variant="link" 
+                                                size="sm" 
+                                                className="h-auto p-0 text-[10px] text-blue-400 hover:text-blue-300"
+                                                onClick={() => handleRevealBlockchainData(bidder.id)}
+                                                disabled={isRevealing === bidder.id}
+                                              >
+                                                {isRevealing === bidder.id ? "Verifying..." : "Verify via Blockchain"}
+                                              </Button>
+                                            </div>
+                                          )}
                                         </div>
                                         <div className="text-right">
                                           <p className="text-xs text-slate-500">Compliance</p>
