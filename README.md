@@ -135,7 +135,7 @@ forge create src/TenderNotary.sol:TenderNotary \
 Once deployed, the terminal will output a Deployed to: address. Copy this value and update your backend/.env:
 
 ```env
-ETH_NOTARY_CONTRACT_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3  # Replace with your actual address
+ETH_NOTARY_CONTRACT_ADDRESS=<YOUR_NOTARY_ADDRESS>  # Replace with your actual address
 ETH_RPC_URL=http://127.0.0.1:8545
 ETH_PRIVATE_KEY=<YOUR_ANVIL_PRIVATE_KEY>
 ```
