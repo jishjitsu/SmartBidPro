@@ -162,6 +162,28 @@ pub async fn update_auction(
         .map_err(AppError::DbError)?
         .ok_or(AppError::InternalError)?;
     
+    // Hash and notarize the updated requirements to the blockchain to prevent hidden tampering
+    let tender_requirements_payload = serde_json::json!({
+        "id": object_id.to_hex(),
+        "title": updated_auction.title,
+        "description": updated_auction.description,
+        "minimum_bid": updated_auction.minimum_bid,
+        "category": updated_auction.category,
+        "created_by": updated_auction.created_by
+    });
+
+    let requirements_hash_bytes = serde_json::to_vec(&tender_requirements_payload)
+        .map_err(|_| AppError::InternalError)?;
+    use sha2::{Sha256, Digest};
+    use alloy::primitives::B256;
+    let requirements_digest = Sha256::digest(&requirements_hash_bytes);
+    let requirements_hash = B256::from_slice(&requirements_digest);
+
+    // Attempt to notarize, but don't fail the DB update if blockchain is slow/down
+    if let Err(e) = state.blockchain.notarize_hash(requirements_hash).await {
+        eprintln!("[blockchain] Failed to notarize updated tender: {:?}", e);
+    }
+    
     Ok(HttpResponse::Ok().json(updated_auction))
 }
 
@@ -191,6 +213,24 @@ pub async fn delete_auction(
         .await
         .map_err(AppError::DbError)?;
     
+    // Notarize the deletion on the blockchain to prevent silent removal of records
+    let delete_payload = serde_json::json!({
+        "action": "TENDER_DELETED",
+        "id": object_id.to_hex(),
+        "deleted_by": user.claims.sub
+    });
+
+    let delete_hash_bytes = serde_json::to_vec(&delete_payload)
+        .map_err(|_| AppError::InternalError)?;
+    use sha2::{Sha256, Digest};
+    use alloy::primitives::B256;
+    let delete_digest = Sha256::digest(&delete_hash_bytes);
+    let delete_hash = B256::from_slice(&delete_digest);
+
+    if let Err(e) = state.blockchain.notarize_hash(delete_hash).await {
+        eprintln!("[blockchain] Failed to notarize tender deletion: {:?}", e);
+    }
+
     Ok(HttpResponse::NoContent().finish())
 }
 

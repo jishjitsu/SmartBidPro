@@ -70,7 +70,9 @@ async fn main() -> std::io::Result<()> {
                     .route("/auctions/{id}", web::put().to(routes::auctions::update_auction))
                     .route("/auctions/{id}", web::delete().to(routes::auctions::delete_auction))
                     .route("/auctions/{id}/notarize", web::post().to(routes::auctions::notarize_auction))
+                    .route("/compliance/analyze", web::post().to(routes::compliance::analyze_compliance))
                     .route("/tenders/{tender_id}/apply", web::post().to(routes::bids::apply_to_tender))
+                    .route("/bids/{bid_id}/private-details", web::get().to(routes::private_bids::get_private_bid_details))
                     .route("/admin/tenders/{tender_id}/bids", web::get().to(routes::bids::get_tender_bids))
                     .route("/admin/bids/{bid_id}/award", web::post().to(routes::bids::award_bid))
                     .route("/vendor/bids", web::get().to(routes::bids::get_vendor_bids)),

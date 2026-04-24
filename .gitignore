@@ -31,7 +31,11 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+/backend/.env
+/fabric/gateway/.env
+/fabric/gateway/wallet/
 .env*
+/fabric/gateway/node_modules
 
 # vercel
 .vercel

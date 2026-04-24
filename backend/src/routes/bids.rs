@@ -80,10 +80,25 @@ pub async fn apply_to_tender(
         updated_at: now,
     };
 
-    let bid_doc = match bson::to_document(&bid) {
+    let mut bid_doc = match bson::to_document(&bid) {
         Ok(doc) => doc,
         Err(_) => return Err(AppError::InternalError),
     };
+
+    // --- SECURITY HARDENING (Web 2.5) ---
+    // We strip sensitive fields from MongoDB (the "Search Index").
+    // The actual "Source of Truth" for these fields will be Hyperledger Fabric PDC.
+    bid_doc.insert("bid_amount", 0.0);
+    bid_doc.insert("proposal_text", "SECURED_IN_BLOCKCHAIN_PDC");
+    bid_doc.insert("documents", bson::Bson::Null);
+    
+    // Keep a summary of compliance for the list view, but hide the breakdown notes
+    if let Some(mut compliance) = bid.compliance_analysis.clone() {
+        compliance.documentation.notes = "ENCRYPTED_IN_FABRIC".to_string();
+        compliance.financial.notes = "ENCRYPTED_IN_FABRIC".to_string();
+        compliance.technical.notes = "ENCRYPTED_IN_FABRIC".to_string();
+        bid_doc.insert("compliance_analysis", bson::to_bson(&compliance).unwrap_or(bson::Bson::Null));
+    }
 
     let bids_collection = state.db.collection::<Document>("bids");
     let result = bids_collection.insert_one(bid_doc).await;
@@ -97,6 +112,32 @@ pub async fn apply_to_tender(
 
             let mut created_bid = bid;
             created_bid.id = Some(inserted_id);
+
+            // Optional: store private bid details in Hyperledger Fabric (PDC) via gateway.
+            // This keeps sensitive fields available only to authorized org members.
+            if let Ok(gateway_url) = std::env::var("FABRIC_GATEWAY_URL") {
+                if !gateway_url.trim().is_empty() {
+                    let private_payload = serde_json::json!({
+                        "bid_id": inserted_id.to_hex(),
+                        "tender_id": created_bid.tender_id,
+                        "vendor_id": created_bid.vendor_id,
+                        "additional_attributes": {
+                            "bid_amount": created_bid.bid_amount,
+                            "proposal_text": created_bid.proposal_text,
+                            "documents": created_bid.documents,
+                            "compliance_analysis": created_bid.compliance_analysis
+                        }
+                    });
+
+                    let url = format!("{}/private-bids/upsert", gateway_url.trim_end_matches('/'));
+                    let client = reqwest::Client::new();
+
+                    if let Err(e) = client.post(url).json(&private_payload).send().await {
+                        // Don't block bid submission if Fabric is down; log and continue.
+                        eprintln!("[fabric-gateway] upsert failed: {e}");
+                    }
+                }
+            }
 
             let bid_hash_payload = serde_json::json!({
                 "id": created_bid.id.as_ref().map(|oid| oid.to_hex()),
@@ -243,6 +284,25 @@ pub async fn award_bid(
         Ok(None) => return Err(AppError::NotFound),
         Err(e) => return Err(AppError::DbError(e)),
     };
+
+    // Notarize the final award decision to the blockchain to prevent post-award tampering
+    let award_payload = serde_json::json!({
+        "action": "BID_AWARDED",
+        "tender_id": awarded_bid.tender_id,
+        "awarded_bid_id": awarded_bid.id.as_ref().map(|oid| oid.to_hex()),
+        "awarded_vendor_id": awarded_bid.vendor_id,
+        "awarded_amount": awarded_bid.bid_amount,
+        "awarded_at": awarded_bid.updated_at
+    });
+
+    let award_hash_bytes = serde_json::to_vec(&award_payload)
+        .map_err(|_| AppError::InternalError)?;
+    let award_digest = Sha256::digest(&award_hash_bytes);
+    let award_hash = B256::from_slice(&award_digest);
+
+    if let Err(e) = state.blockchain.notarize_hash(award_hash).await {
+        eprintln!("[blockchain] Failed to notarize award decision: {:?}", e);
+    }
 
     Ok(HttpResponse::Ok().json(awarded_bid))
 }

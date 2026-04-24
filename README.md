@@ -68,10 +68,17 @@ cd backend
 
 2. Create a `.env` file with your configuration:
 ```env
+# Database (If using WSL to connect to Windows MongoDB, use the Windows Host IP and add ?directConnection=true)
 MONGODB_URI=mongodb://localhost:27017/smartbidpro
 JWT_SECRET=your-secret-key-change-this-in-production
-Actix_PORT=8000
-Actix_ADDRESS=0.0.0.0
+ACTIX_PORT=8000
+ACTIX_ADDRESS=0.0.0.0
+
+# Gemini API Key for AI Compliance Checking
+GEMINI_API_KEY=your-gemini-api-key
+
+# Ethereum Notary (Anvil)
+ETH_RPC_URL=http://127.0.0.1:8545
 ETH_NOTARY_CONTRACT_ADDRESS=your-notary-contract-address
 ETH_PRIVATE_KEY=your-ethereum-private-key
 ```

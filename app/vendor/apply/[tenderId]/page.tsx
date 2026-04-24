@@ -9,8 +9,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { AIComplianceAnalysis } from "@/components/AIComplianceAnalysis"
-import { getMockComplianceResponse, simulateAIProcessing, ComplianceAnalysis } from "@/lib/mockData"
+import type { ComplianceAnalysis } from "@/lib/mockData"
 import { ArrowLeft, ArrowRight, Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+
+const USD_TO_INR = 82.5
 
 interface Auction {
   _id: string
@@ -39,6 +41,71 @@ export default function ApplyTenderPage() {
   const [bidAmount, setBidAmount] = useState("")
   const [proposalText, setProposalText] = useState("")
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([])
+
+  const runComplianceAnalysis = async (token: string, docs: string[]) => {
+    if (!auction) return
+    setIsProcessing(true)
+    setStep(3)
+    setErrorMessage("")
+
+    try {
+      const resp = await fetch(`http://localhost:8000/api/compliance/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          tender_description: auction.description || "",
+          proposal_text: proposalText || "",
+          documents: docs,
+        }),
+      })
+
+      if (!resp.ok) {
+        const t = await resp.text()
+        console.error("Compliance analysis failed:", t)
+        throw new Error("Compliance analysis failed")
+      }
+
+      const data = await resp.json()
+
+      const analysis = data?.analysis
+      if (!analysis) throw new Error("Invalid compliance response")
+
+      const mapped: ComplianceAnalysis = {
+        status: "success",
+        ai_analysis: {
+          total_score: analysis.total_score ?? 0,
+          risk_level: analysis.risk_level ?? "Medium",
+          breakdown: {
+            documentation: {
+              score: analysis.documentation?.score ?? 0,
+              status: (analysis.documentation?.status ?? "Pass") as any,
+              notes: analysis.documentation?.notes ?? "",
+            },
+            financial: {
+              score: analysis.financial?.score ?? 0,
+              status: (analysis.financial?.status ?? "Pass") as any,
+              notes: analysis.financial?.notes ?? "",
+            },
+            technical: {
+              score: analysis.technical?.score ?? 0,
+              status: (analysis.technical?.status ?? "Pass") as any,
+              notes: analysis.technical?.notes ?? "",
+            },
+          },
+        },
+      }
+
+      setComplianceData(mapped)
+    } catch (e) {
+      setComplianceData(undefined)
+      setErrorMessage("AI compliance analysis failed. You can still submit, or try again.")
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   useEffect(() => {
     const token = localStorage.getItem("token")
@@ -79,15 +146,13 @@ export default function ApplyTenderPage() {
     const fileNames = Array.from(files).map(f => f.name)
     setUploadedFiles([...uploadedFiles, ...fileNames])
     
-    // Trigger AI analysis
-    setIsProcessing(true)
-    setStep(3)
-    
-    await simulateAIProcessing()
-    
-    const mockResponse = getMockComplianceResponse()
-    setComplianceData(mockResponse)
-    setIsProcessing(false)
+    const token = localStorage.getItem("token")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+
+    await runComplianceAnalysis(token, [...uploadedFiles, ...fileNames])
   }
 
   const handleSubmitBid = async () => {
@@ -117,7 +182,7 @@ export default function ApplyTenderPage() {
       }
 
       const bidData = {
-        bid_amount: isNaN(parseFloat(bidAmount)) ? 0 : parseFloat(bidAmount),
+        bid_amount: isNaN(parseFloat(bidAmount)) ? 0 : parseFloat(bidAmount) / USD_TO_INR,
         proposal_text: proposalText || "",
         documents: uploadedFiles.length > 0 ? uploadedFiles : undefined,
         compliance_analysis: complianceData?.ai_analysis?.breakdown ? {
@@ -275,7 +340,7 @@ export default function ApplyTenderPage() {
                        style: "currency",
                        currency: "INR",
                        maximumFractionDigits: 0,
-                     }).format(auction.minimum_bid)}
+                     }).format(auction.minimum_bid * USD_TO_INR)}
                    </span>
                  </div>
                  <div className="flex justify-between items-center text-sm">
@@ -357,13 +422,13 @@ export default function ApplyTenderPage() {
                     type="number"
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
-                    placeholder={auction.minimum_bid.toString()}
+                    placeholder={(auction.minimum_bid * USD_TO_INR).toString()}
                     className="pl-8 text-lg bg-slate-950 border-slate-700 text-white placeholder:text-slate-600 focus:border-indigo-500"
                     required
                     disabled={hasAlreadyApplied}
                   />
                 </div>
-                {bidAmount && parseFloat(bidAmount) < auction.minimum_bid && (
+                {bidAmount && parseFloat(bidAmount) < (auction.minimum_bid * USD_TO_INR) && (
                   <div className="flex items-center gap-2 text-amber-500 text-sm mt-2">
                     <AlertCircle className="h-4 w-4" />
                     <span>Bid amount is below the minimum required</span>
@@ -388,7 +453,7 @@ export default function ApplyTenderPage() {
 
               <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                 <p className="text-sm text-emerald-400">
-                  <strong>Minimum Bid:</strong> {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(auction.minimum_bid)}
+                  <strong>Minimum Bid:</strong> {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(auction.minimum_bid * USD_TO_INR)}
                 </p>
                 <p className="text-xs text-emerald-500/70 mt-2">
                   Your bid must meet or exceed the minimum bid amount to be considered.
@@ -398,7 +463,7 @@ export default function ApplyTenderPage() {
               <div className="flex justify-end pt-6 border-t border-slate-800">
                 <Button
                   onClick={() => setStep(2)}
-                  disabled={!bidAmount || !proposalText.trim() || parseFloat(bidAmount) < auction.minimum_bid || hasAlreadyApplied}
+                  disabled={!bidAmount || !proposalText.trim() || parseFloat(bidAmount) < (auction.minimum_bid * USD_TO_INR) || hasAlreadyApplied}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white"
                 >
                   Next: Upload Documents
