@@ -165,6 +165,7 @@ export default function AdminDashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTender, setSelectedTender] = useState<string | null>(null)
+  const [bidders, setBidders] = useState<BidData[]>([])
   const [revealedBids, setRevealedBids] = useState<Record<string, any>>({})
   const [isRevealing, setIsRevealing] = useState<string | null>(null)
   const [activityFeed] = useState<ActivityItem[]>(getActivityFeed())
@@ -297,6 +298,7 @@ export default function AdminDashboardPage() {
       setIsRevealing(null)
     }
   }
+  const handleDeleteTender = async (tenderId: string) => {
     console.log("Delete tender ID:", tenderId) // Debug log
     if (!tenderId) {
       alert("Error: Tender ID is missing")
