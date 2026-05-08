@@ -159,11 +159,14 @@ pub async fn apply_to_tender(
             let bid_digest = Sha256::digest(&bid_hash_bytes);
             let bid_hash = B256::from_slice(&bid_digest);
 
-            state
-                .blockchain
-                .notarize_hash(bid_hash)
-                .await
-                .map_err(|_| AppError::InternalError)?;
+            if let Some(blockchain) = state.blockchain.as_ref() {
+                blockchain
+                    .notarize_hash(bid_hash)
+                    .await
+                    .map_err(|_| AppError::InternalError)?;
+            } else {
+                eprintln!("[blockchain] skipping bid notarization: blockchain client not configured");
+            }
 
             Ok(HttpResponse::Created().json(created_bid))
         }
@@ -300,8 +303,12 @@ pub async fn award_bid(
     let award_digest = Sha256::digest(&award_hash_bytes);
     let award_hash = B256::from_slice(&award_digest);
 
-    if let Err(e) = state.blockchain.notarize_hash(award_hash).await {
-        eprintln!("[blockchain] Failed to notarize award decision: {:?}", e);
+    if let Some(blockchain) = state.blockchain.as_ref() {
+        if let Err(e) = blockchain.notarize_hash(award_hash).await {
+            eprintln!("[blockchain] Failed to notarize award decision: {:?}", e);
+        }
+    } else {
+        eprintln!("[blockchain] skipping award notarization: blockchain client not configured");
     }
 
     Ok(HttpResponse::Ok().json(awarded_bid))

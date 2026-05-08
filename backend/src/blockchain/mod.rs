@@ -15,10 +15,11 @@ sol!(
     "../contracts/out/TenderNotary.sol/TenderNotary.json"
 );
 
+
 #[derive(Clone)]
 pub struct BlockchainClient {
-    provider: DynProvider,
-    notary_address: Address,
+    pub provider: DynProvider,
+    pub notary_address: Address,
 }
 
 impl BlockchainClient {

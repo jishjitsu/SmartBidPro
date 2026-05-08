@@ -27,7 +27,8 @@ export default function EditTenderPage() {
     minimum_bid: "",
     start_date: "",
     end_date: "",
-    status: "Open"
+    status: "Open",
+    min_compliance: 80
   })
 
   useEffect(() => {
@@ -66,7 +67,8 @@ export default function EditTenderPage() {
           minimum_bid: minimumBidINR.toString(),
           start_date: tender.start_date.split('T')[0],
           end_date: tender.end_date.split('T')[0],
-          status: tender.status
+          status: tender.status,
+          min_compliance: tender.min_compliance || 80
         })
       } catch (error) {
         console.error("Error fetching tender:", error)
@@ -102,7 +104,8 @@ export default function EditTenderPage() {
           minimum_bid: minimumBidUSD,
           start_date: new Date(formData.start_date).toISOString(),
           end_date: new Date(formData.end_date).toISOString(),
-          status: formData.status
+          status: formData.status,
+          min_compliance: parseInt(formData.min_compliance.toString()) || 80
         }),
       })
 
@@ -264,6 +267,21 @@ export default function EditTenderPage() {
                   required
                 />
                 <p className="text-xs text-slate-500">Enter amount in Indian Rupees (e.g., ₹82,50,000)</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Minimum Compliance Score *</label>
+                <Input
+                  type="number"
+                  value={formData.min_compliance}
+                  onChange={(e) => setFormData({ ...formData, min_compliance: parseInt(e.target.value) || 0 })}
+                  placeholder="80"
+                  min="0"
+                  max="100"
+                  className="bg-slate-800 border-slate-700 text-white"
+                  required
+                />
+                <p className="text-xs text-slate-500">Required AI compliance score (0-100) for bids to be considered eligible</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

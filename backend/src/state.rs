@@ -6,5 +6,5 @@ use mongodb::Database;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
-    pub blockchain: Arc<BlockchainClient>,
+    pub blockchain: Option<Arc<BlockchainClient>>,
 }

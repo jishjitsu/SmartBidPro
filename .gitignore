@@ -36,7 +36,7 @@ yarn-error.log*
 /fabric/gateway/wallet/
 .env*
 /fabric/gateway/node_modules
-
+/fabric/chaincode/
 # vercel
 .vercel
 

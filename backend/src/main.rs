@@ -37,11 +37,19 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to connect to database");
 
-    let blockchain = Arc::new(
-        BlockchainClient::new(&eth_rpc_url)
-            .await
-            .expect("Failed to initialize blockchain client"),
-    );
+    let blockchain = match std::env::var("ETH_PRIVATE_KEY") {
+        Ok(_) => match BlockchainClient::new(&eth_rpc_url).await {
+            Ok(client) => Some(Arc::new(client)),
+            Err(err) => {
+                eprintln!("[blockchain] disabled: failed to initialize client: {err}");
+                None
+            }
+        },
+        Err(_) => {
+            eprintln!("[blockchain] disabled: ETH_PRIVATE_KEY is not set");
+            None
+        }
+    };
 
     let app_state = state::AppState {
         db: client.database(&database_name),
@@ -70,7 +78,9 @@ async fn main() -> std::io::Result<()> {
                     .route("/auctions/{id}", web::put().to(routes::auctions::update_auction))
                     .route("/auctions/{id}", web::delete().to(routes::auctions::delete_auction))
                     .route("/auctions/{id}/notarize", web::post().to(routes::auctions::notarize_auction))
+                    .route("/auctions/{id}/proof", web::get().to(routes::auctions::verify_tender_proof))
                     .route("/compliance/analyze", web::post().to(routes::compliance::analyze_compliance))
+                    .route("/ai/tender-requirements", web::post().to(routes::compliance::generate_tender_requirements))
                     .route("/tenders/{tender_id}/apply", web::post().to(routes::bids::apply_to_tender))
                     .route("/bids/{bid_id}/private-details", web::get().to(routes::private_bids::get_private_bid_details))
                     .route("/admin/tenders/{tender_id}/bids", web::get().to(routes::bids::get_tender_bids))

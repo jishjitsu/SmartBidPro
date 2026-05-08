@@ -19,6 +19,7 @@ interface Auction {
   title: string
   description: string
   minimum_bid: number
+  min_compliance?: number
   start_date: string
   end_date: string
 }
@@ -166,8 +167,9 @@ export default function ApplyTenderPage() {
       return
     }
 
-    if (complianceData && complianceData.ai_analysis.total_score < 80) {
-      setErrorMessage("Compliance score is too low to submit bid. Please improve your documentation.")
+    const requiredScore = auction?.min_compliance || 80
+    if (complianceData && complianceData.ai_analysis.total_score < requiredScore) {
+      setErrorMessage(`Compliance score is too low to submit bid. Minimum required is ${requiredScore}%.`)
       return
     }
 
@@ -563,6 +565,7 @@ export default function ApplyTenderPage() {
               data={complianceData}
               isProcessing={isProcessing}
               showDetailedBreakdown={true}
+              minScore={auction?.min_compliance}
             />
 
             {complianceData && !isProcessing && (
@@ -613,7 +616,7 @@ export default function ApplyTenderPage() {
                     </Button>
                     <Button
                       onClick={handleSubmitBid}
-                      disabled={isSubmitting || (complianceData && complianceData.ai_analysis.total_score < 80)}
+                      disabled={isSubmitting || (complianceData && complianceData.ai_analysis.total_score < (auction?.min_compliance || 80))}
                       className="bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
                       {isSubmitting ? "Submitting..." : "Submit Sealed Bid"}

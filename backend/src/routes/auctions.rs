@@ -10,6 +10,16 @@ use futures::stream::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+#[derive(Serialize)]
+pub struct TenderProofResponse {
+    pub anchored: bool,
+    pub anchor_timestamp: Option<u64>,
+    pub anchor_datetime: Option<String>,
+    pub tender_hash: String,
+    pub contract_address: String,
+    pub rpc_url: String,
+}
+
 #[derive(Deserialize)]
 pub struct NotarizeRequest {
     pub data_hash: String,
@@ -75,6 +85,10 @@ pub async fn create_auction(
         end_date: auction_data.end_date,
         minimum_bid: auction_data.minimum_bid,
         category: auction_data.category.clone(),
+        min_compliance: auction_data.min_compliance,
+        requirements: auction_data.requirements.clone(),
+        technical_requirements: auction_data.technical_requirements.clone(),
+        financial_requirements: auction_data.financial_requirements.clone(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
@@ -99,6 +113,8 @@ pub async fn create_auction(
         "end_date": created_auction.end_date,
         "minimum_bid": created_auction.minimum_bid,
         "category": created_auction.category,
+        "min_compliance": created_auction.min_compliance,
+        "requirements": created_auction.requirements,
         "created_by": created_auction.created_by
     });
 
@@ -107,11 +123,14 @@ pub async fn create_auction(
     let requirements_digest = Sha256::digest(&requirements_hash_bytes);
     let requirements_hash = B256::from_slice(&requirements_digest);
 
-    state
-        .blockchain
-        .notarize_hash(requirements_hash)
-        .await
-        .map_err(|_| AppError::InternalError)?;
+    if let Some(blockchain) = state.blockchain.as_ref() {
+        blockchain
+            .notarize_hash(requirements_hash)
+            .await
+            .map_err(|_| AppError::InternalError)?;
+    } else {
+        eprintln!("[blockchain] skipping auction notarization: blockchain client not configured");
+    }
     
     Ok(HttpResponse::Created().json(created_auction))
 }
@@ -147,6 +166,10 @@ pub async fn update_auction(
             "end_date": bson::to_bson(&auction_data.end_date).map_err(|_| AppError::InternalError)?,
             "minimum_bid": auction_data.minimum_bid,
             "category": &auction_data.category,
+            "min_compliance": auction_data.min_compliance,
+            "requirements": &auction_data.requirements,
+            "technical_requirements": bson::to_bson(&auction_data.technical_requirements).map_err(|_| AppError::InternalError)?,
+            "financial_requirements": bson::to_bson(&auction_data.financial_requirements).map_err(|_| AppError::InternalError)?,
             "updated_at": bson::to_bson(&Utc::now()).map_err(|_| AppError::InternalError)?,
         }
     };
@@ -169,7 +192,9 @@ pub async fn update_auction(
         "description": updated_auction.description,
         "minimum_bid": updated_auction.minimum_bid,
         "category": updated_auction.category,
-        "created_by": updated_auction.created_by
+        "created_by": updated_auction.created_by,
+        "min_compliance": updated_auction.min_compliance,
+        "requirements": updated_auction.requirements,
     });
 
     let requirements_hash_bytes = serde_json::to_vec(&tender_requirements_payload)
@@ -180,8 +205,12 @@ pub async fn update_auction(
     let requirements_hash = B256::from_slice(&requirements_digest);
 
     // Attempt to notarize, but don't fail the DB update if blockchain is slow/down
-    if let Err(e) = state.blockchain.notarize_hash(requirements_hash).await {
-        eprintln!("[blockchain] Failed to notarize updated tender: {:?}", e);
+    if let Some(blockchain) = state.blockchain.as_ref() {
+        if let Err(e) = blockchain.notarize_hash(requirements_hash).await {
+            eprintln!("[blockchain] Failed to notarize updated tender: {:?}", e);
+        }
+    } else {
+        eprintln!("[blockchain] skipping updated tender notarization: blockchain client not configured");
     }
     
     Ok(HttpResponse::Ok().json(updated_auction))
@@ -227,8 +256,12 @@ pub async fn delete_auction(
     let delete_digest = Sha256::digest(&delete_hash_bytes);
     let delete_hash = B256::from_slice(&delete_digest);
 
-    if let Err(e) = state.blockchain.notarize_hash(delete_hash).await {
-        eprintln!("[blockchain] Failed to notarize tender deletion: {:?}", e);
+    if let Some(blockchain) = state.blockchain.as_ref() {
+        if let Err(e) = blockchain.notarize_hash(delete_hash).await {
+            eprintln!("[blockchain] Failed to notarize tender deletion: {:?}", e);
+        }
+    } else {
+        eprintln!("[blockchain] skipping tender deletion notarization: blockchain client not configured");
     }
 
     Ok(HttpResponse::NoContent().finish())
@@ -245,8 +278,9 @@ pub async fn notarize_auction(
         .parse::<B256>()
         .map_err(|_| AppError::BadRequest)?;
 
-    let tx_hash = state
-        .blockchain
+    let blockchain = state.blockchain.as_ref().ok_or(AppError::InternalError)?;
+
+    let tx_hash = blockchain
         .notarize_hash(data_hash)
         .await
         .map_err(|_| AppError::InternalError)?;
@@ -254,4 +288,90 @@ pub async fn notarize_auction(
     Ok(HttpResponse::Ok().json(NotarizeResponse {
         tx_hash: tx_hash.to_string(),
     }))
+}
+
+pub async fn verify_tender_proof(
+    state: web::Data<AppState>,
+    _user: AuthenticatedUser,
+    id: web::Path<String>,
+) -> Result<HttpResponse, AppError> {
+    let collection = state.db.collection::<Auction>("auctions");
+    let id = id.into_inner();
+
+    let object_id = ObjectId::parse_str(&id).map_err(|_| AppError::BadRequest)?;
+    let auction = collection
+        .find_one(doc! { "_id": object_id })
+        .await
+        .map_err(AppError::DbError)?
+        .ok_or(AppError::NotFound)?;
+
+    // Recompute the same hash that was anchored when the tender was created
+    let payload = serde_json::json!({
+        "title": auction.title,
+        "description": auction.description,
+        "start_date": auction.start_date,
+        "end_date": auction.end_date,
+        "minimum_bid": auction.minimum_bid,
+        "category": auction.category,
+        "min_compliance": auction.min_compliance,
+        "requirements": auction.requirements,
+        "created_by": auction.created_by
+    });
+    let hash_bytes = serde_json::to_vec(&payload).map_err(|_| AppError::InternalError)?;
+    let digest = Sha256::digest(&hash_bytes);
+    let tender_hash = B256::from_slice(&digest);
+    let tender_hash_hex = format!("0x{}", hex::encode(tender_hash.as_slice()));
+
+    let contract_address = std::env::var("ETH_NOTARY_CONTRACT_ADDRESS")
+        .unwrap_or_else(|_| "0x0000000000000000000000000000000000000000".to_string());
+    let rpc_url = std::env::var("ETH_RPC_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:8545".to_string());
+
+    let blockchain = match state.blockchain.as_ref() {
+        Some(b) => b,
+        None => {
+            return Ok(HttpResponse::Ok().json(TenderProofResponse {
+                anchored: false,
+                anchor_timestamp: None,
+                anchor_datetime: None,
+                tender_hash: tender_hash_hex,
+                contract_address,
+                rpc_url,
+            }));
+        }
+    };
+
+    let contract = crate::blockchain::TenderNotary::new(
+        contract_address.parse().map_err(|_| AppError::InternalError)?,
+        blockchain.provider.clone(),
+    );
+
+    match contract.getAnchorTime(tender_hash).call().await {
+        Ok(ts) => {
+            let timestamp_u64: u64 = ts.to::<u64>();
+            use chrono::TimeZone;
+            let dt = chrono::Utc.timestamp_opt(timestamp_u64 as i64, 0)
+                .single()
+                .map(|d| d.to_rfc3339());
+            Ok(HttpResponse::Ok().json(TenderProofResponse {
+                anchored: true,
+                anchor_timestamp: Some(timestamp_u64),
+                anchor_datetime: dt,
+                tender_hash: tender_hash_hex,
+                contract_address,
+                rpc_url,
+            }))
+        }
+        Err(_) => {
+            // Hash not anchored yet or contract error
+            Ok(HttpResponse::Ok().json(TenderProofResponse {
+                anchored: false,
+                anchor_timestamp: None,
+                anchor_datetime: None,
+                tender_hash: tender_hash_hex,
+                contract_address,
+                rpc_url,
+            }))
+        }
+    }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
@@ -15,6 +16,7 @@ import {
   Clock, ShieldAlert, Zap, FileText, Bell, Building2, Laptop, Briefcase,
   HeartPulse, GraduationCap, Truck, Shield, Sprout, Zap as Energy,
   Factory, Users as Consulting, HardHat, Wrench, Package,
+  Loader2, Copy, CheckCheck, ShieldCheck,
 } from "lucide-react"
 
 // Comprehensive Category Configuration
@@ -159,6 +161,134 @@ interface User {
   role: string
 }
 
+// ─── Copy helper ──────────────────────────────────────────────────────────
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+      className="ml-2 inline-flex items-center text-slate-400 hover:text-indigo-400 transition-colors"
+    >
+      {copied ? <CheckCheck className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  )
+}
+
+// ─── Private Bid Ledger Modal (Fabric PDC) ─────────────────────────────────
+function BidLedgerModal({ bidId, bidderName, open, onClose }: { bidId: string; bidderName: string; open: boolean; onClose: () => void }) {
+  const [data, setData] = useState<{ ok: boolean; details: any } | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (!open || !bidId) return
+    setLoading(true)
+    setError("")
+    setData(null)
+    const token = localStorage.getItem("token")
+    fetch(`http://localhost:8000/api/bids/${bidId}/private-details`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async r => {
+        if (r.status === 404) throw new Error("No private record found in Fabric ledger for this bid.")
+        if (!r.ok) throw new Error("Fabric gateway returned an error.")
+        return r.json()
+      })
+      .then(setData)
+      .catch(e => setError(e.message || "Failed to fetch from Fabric ledger."))
+      .finally(() => setLoading(false))
+  }, [open, bidId])
+
+  const USD_TO_INR = 82.5
+  const attrs = data?.details?.additional_attributes
+
+  return (
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg bg-slate-900 border-slate-700 text-slate-100">
+        <div className="py-4 space-y-4">
+          {loading && (
+            <div className="flex flex-col items-center gap-3 py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+              <p className="text-sm text-slate-400">Querying Fabric PDC…</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <ShieldAlert className="h-4 w-4 text-red-400" />
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+
+          {data && !loading && (
+            <>
+              <div className="flex items-center gap-3 p-4 rounded-xl border bg-emerald-500/10 border-emerald-500/25">
+                <CheckCircle2 className="h-6 w-6 text-emerald-400 shrink-0" />
+                <div>
+                  <p className="font-semibold text-emerald-400">Private Record Found</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Retrieved from Hyperledger Fabric Private Data Collection</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                  <p className="text-xs text-slate-500 mb-1">Bid ID</p>
+                  <div className="flex items-center">
+                    <p className="text-xs font-mono text-emerald-300 break-all flex-1">{bidId}</p>
+                    <CopyBtn text={bidId} />
+                  </div>
+                </div>
+
+                {attrs?.bid_amount !== undefined && (
+                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <p className="text-xs text-slate-500 mb-1">Actual Bid Amount (from Fabric)</p>
+                    <p className="text-lg font-bold text-amber-400">
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(attrs.bid_amount * USD_TO_INR)}
+                      <span className="ml-2 text-xs text-emerald-400 font-normal">✓ Fabric-verified</span>
+                    </p>
+                  </div>
+                )}
+
+                {attrs?.proposal_text && (
+                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <p className="text-xs text-slate-500 mb-2">Proposal Text</p>
+                    <p className="text-xs text-slate-300 leading-relaxed line-clamp-4">{attrs.proposal_text}</p>
+                  </div>
+                )}
+
+                {attrs?.compliance_analysis && (
+                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <p className="text-xs text-slate-500 mb-2">Compliance Breakdown (from Fabric)</p>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      {["documentation", "financial", "technical"].map(k => (
+                        <div key={k} className="bg-slate-900 rounded p-2">
+                          <p className="text-xs text-slate-500 capitalize">{k}</p>
+                          <p className="text-sm font-bold text-indigo-400">
+                            {attrs.compliance_analysis[k]?.score ?? "—"}%
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                  <p className="text-xs text-slate-500 mb-1">Raw PDC Record</p>
+                  <pre className="text-xs text-slate-400 overflow-auto max-h-28 font-mono whitespace-pre-wrap">{JSON.stringify(data.details, null, 2)}</pre>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} className="text-slate-400 hover:text-white">Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function AdminDashboardPage() {
   const router = useRouter()
   const [auctions, setAuctions] = useState<Auction[]>([])
@@ -166,8 +296,8 @@ export default function AdminDashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedTender, setSelectedTender] = useState<string | null>(null)
   const [bidders, setBidders] = useState<BidData[]>([])
-  const [revealedBids, setRevealedBids] = useState<Record<string, any>>({})
-  const [isRevealing, setIsRevealing] = useState<string | null>(null)
+  const [ledgerBidId, setLedgerBidId] = useState<string | null>(null)
+  const [ledgerBidderName, setLedgerBidderName] = useState<string>("")
   const [activityFeed] = useState<ActivityItem[]>(getActivityFeed())
 
   useEffect(() => {
@@ -235,7 +365,7 @@ export default function AdminDashboardPage() {
       setBidders([])
     } else {
       setSelectedTender(tenderId)
-      
+
       // Fetch real bids from API
       try {
         const token = localStorage.getItem("token")
@@ -257,7 +387,7 @@ export default function AdminDashboardPage() {
         }
 
         const bids = await response.json()
-        
+
         // Map backend bids to frontend BidData format
         const mappedBids: BidData[] = bids.map((bid: any) => ({
           id: bid.id || bid._id,
@@ -278,25 +408,9 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const handleRevealBlockchainData = async (bidId: string) => {
-    setIsRevealing(bidId)
-    try {
-      const token = localStorage.getItem("token")
-      const response = await fetch(`http://localhost:8000/api/bids/${bidId}/private-details`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      })
-      if (!response.ok) throw new Error("Failed to fetch private data")
-      const data = await response.json()
-      
-      // The data from Fabric contains the original values
-      const details = data.details.additional_attributes || data.details
-      setRevealedBids(prev => ({ ...prev, [bidId]: details }))
-    } catch (error) {
-      console.error("Reveal error:", error)
-      alert("Could not verify data via Blockchain Gateway")
-    } finally {
-      setIsRevealing(null)
-    }
+  const handleOpenLedger = (bidId: string, bidderName: string) => {
+    setLedgerBidderName(bidderName)
+    setLedgerBidId(bidId)
   }
   const handleDeleteTender = async (tenderId: string) => {
     console.log("Delete tender ID:", tenderId) // Debug log
@@ -304,7 +418,7 @@ export default function AdminDashboardPage() {
       alert("Error: Tender ID is missing")
       return
     }
-    
+
     if (!confirm("Are you sure you want to delete this tender? This action cannot be undone.")) {
       return
     }
@@ -371,7 +485,7 @@ export default function AdminDashboardPage() {
       }
 
       alert(`Tender awarded to ${bidderName} successfully!`)
-      
+
       // Refresh the tender list and bids
       await fetchAuctions(token)
       if (selectedTender) {
@@ -565,22 +679,21 @@ export default function AdminDashboardPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1.5">
                               <CardTitle className="text-base font-semibold text-white truncate">{auction.title}</CardTitle>
-                              
+
                               {/* Category Badge */}
                               <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${categoryConfig.badgeColor}`}>
                                 <CategoryIcon className="h-3 w-3 mr-1" />
                                 {categoryConfig.label}
                               </span>
-                              
+
                               {/* Status Badge */}
                               <span
-                                className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
-                                  auction.status === "Open"
+                                className={`shrink-0 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border ${auction.status === "Open"
                                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                     : auction.status === "Awarded"
-                                    ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                                    : "bg-slate-700/50 text-slate-400 border-slate-600"
-                                }`}
+                                      ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                      : "bg-slate-700/50 text-slate-400 border-slate-600"
+                                  }`}
                               >
                                 {auction.status === "Awarded" ? (
                                   <><CheckCircle2 className="h-3 w-3 mr-1" /> Awarded</>
@@ -608,17 +721,17 @@ export default function AdminDashboardPage() {
                                 <><Eye className="h-3.5 w-3.5 mr-1" /> Bids</>
                               )}
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="text-slate-400 hover:text-white hover:bg-slate-800 p-2"
                               onClick={() => handleEditTender(auction.id)}
                             >
                               <Edit className="h-3.5 w-3.5" />
                             </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               className="text-red-500/70 hover:text-red-400 hover:bg-slate-800 p-2"
                               onClick={() => handleDeleteTender(auction.id)}
                             >
@@ -659,59 +772,54 @@ export default function AdminDashboardPage() {
                                 </h4>
                                 <div className="space-y-2.5">
                                   {bidders.map((bidder) => (
-                                    <div key={bidder.id} className="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/50">
-                                      <div className="flex-1 min-w-0 mr-4">
-                                        <p className="text-sm font-medium text-white truncate">{bidder.bidder_company}</p>
-                                        <p className="text-xs text-slate-400">{bidder.bidder_name}</p>
-                                      </div>
-                                      <div className="flex items-center gap-4 shrink-0">
-                                        <div className="text-right">
-                                          <p className="text-xs text-slate-500">Amount</p>
-                                          {revealedBids[bidder.id] ? (
-                                            <p className="text-sm font-bold text-amber-400">
-                                              ₹{(revealedBids[bidder.id].bid_amount * USD_TO_INR).toLocaleString('en-IN')}
-                                              <span className="ml-1 text-[10px] text-emerald-500 font-normal">(Verified)</span>
-                                            </p>
-                                          ) : (
-                                            <div className="flex flex-col items-end">
-                                              <p className="text-sm font-bold text-slate-600 line-through">₹0</p>
-                                              <Button 
-                                                variant="link" 
-                                                size="sm" 
-                                                className="h-auto p-0 text-[10px] text-blue-400 hover:text-blue-300"
-                                                onClick={() => handleRevealBlockchainData(bidder.id)}
-                                                disabled={isRevealing === bidder.id}
-                                              >
-                                                {isRevealing === bidder.id ? "Verifying..." : "Verify via Blockchain"}
-                                              </Button>
-                                            </div>
-                                          )}
+                                    <div key={bidder.id} className="p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 space-y-3">
+                                      {/* Top row: identity + status badge + award */}
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-semibold text-white truncate">{bidder.bidder_company}</p>
+                                          <p className="text-xs text-slate-400">{bidder.bidder_name}</p>
                                         </div>
-                                        <div className="text-right">
-                                          <p className="text-xs text-slate-500">Compliance</p>
-                                          <p className={`text-sm font-bold ${
-                                            bidder.compliance_score >= 85 ? "text-emerald-400" :
-                                            bidder.compliance_score >= 70 ? "text-amber-400" : "text-red-400"
-                                          }`}>{bidder.compliance_score}%</p>
-                                        </div>
-                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${
-                                          bidder.risk_level === "Low"
+                                        <span className={`shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${bidder.risk_level === "Low"
                                             ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                                             : bidder.risk_level === "Medium"
-                                            ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                            : "bg-red-500/10 text-red-400 border-red-500/20"
-                                        }`}>
-                                          {bidder.risk_level}
+                                              ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                              : "bg-red-500/10 text-red-400 border-red-500/20"
+                                          }`}>
+                                          {bidder.risk_level} Risk
                                         </span>
-                                        <Button 
-                                          size="sm" 
-                                          className="bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-xs h-7 px-3"
+                                        <Button
+                                          size="sm"
+                                          className="shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold text-xs h-7 px-3"
                                           onClick={() => handleAwardBid(bidder.id, bidder.bidder_name, auction.id)}
                                           disabled={bidder.status === "Accepted" || bidder.status === "Rejected"}
                                         >
-                                          {bidder.status === "Accepted" ? "Awarded" : bidder.status === "Rejected" ? "Rejected" : "Award"}
+                                          {bidder.status === "Accepted" ? "✓ Awarded" : bidder.status === "Rejected" ? "Rejected" : "Award"}
                                         </Button>
                                       </div>
+
+                                      {/* Stats row */}
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-700">
+                                          <p className="text-xs text-slate-500 mb-0.5">Compliance</p>
+                                          <p className={`text-base font-bold ${bidder.compliance_score >= 85 ? "text-emerald-400" :
+                                              bidder.compliance_score >= 70 ? "text-amber-400" : "text-red-400"
+                                            }`}>{bidder.compliance_score}%</p>
+                                        </div>
+                                        <div className="p-2 rounded-lg bg-slate-900 border border-slate-700">
+                                          <p className="text-xs text-slate-500 mb-0.5">Submitted</p>
+                                          <p className="text-xs text-slate-300">{new Date(bidder.submitted_at).toLocaleDateString()}</p>
+                                        </div>
+                                      </div>
+
+                                      {/* Blockchain button */}
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 text-xs"
+                                        onClick={() => handleOpenLedger(bidder.id, bidder.bidder_name)}
+                                      >
+                                        <Shield className="h-3.5 w-3.5 mr-1.5" /> View Private Bid Ledger
+                                      </Button>
                                     </div>
                                   ))}
                                 </div>
@@ -776,6 +884,16 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       </main>
+
+      {/* Bid Ledger Modal */}
+      {ledgerBidId && (
+        <BidLedgerModal
+          bidId={ledgerBidId}
+          bidderName={ledgerBidderName}
+          open={!!ledgerBidId}
+          onClose={() => setLedgerBidId(null)}
+        />
+      )}
     </div>
   )
 }

@@ -12,12 +12,14 @@ interface AIComplianceAnalysisProps {
   data?: ComplianceAnalysis
   isProcessing?: boolean
   showDetailedBreakdown?: boolean
+  minScore?: number
 }
 
 export function AIComplianceAnalysis({ 
   data, 
   isProcessing = false,
-  showDetailedBreakdown = true
+  showDetailedBreakdown = true,
+  minScore = 80
 }: AIComplianceAnalysisProps) {
   const [displayScore, setDisplayScore] = useState(0)
 
@@ -237,7 +239,7 @@ export function AIComplianceAnalysis({
         )}
 
         {/* Recommendation */}
-        {data.ai_analysis.total_score >= 80 ? (
+        {data.ai_analysis.total_score >= minScore ? (
           <div className="flex items-start gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
             <CheckCircle2 className="h-5 w-5 text-emerald-500 mt-0.5" />
             <div>

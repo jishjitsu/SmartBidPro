@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { generateMockRequirements } from "@/lib/mockData"
 import { ArrowLeft, Sparkles, CheckCircle2, Loader2 } from "lucide-react"
 
 export default function CreateTenderPage() {
@@ -24,18 +23,48 @@ export default function CreateTenderPage() {
     minimum_bid: "",
     start_date: "",
     end_date: "",
-    requirements: ""
+    requirements: "",
+    technical_requirements: "",
+    financial_requirements: "",
+    min_compliance: ""
   })
 
   const handleGenerateRequirements = async () => {
     setIsGenerating(true)
-    
-    // Simulate AI generation with animation
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    
-    const generated = generateMockRequirements(formData.category)
-    setFormData({ ...formData, requirements: generated })
-    setIsGenerating(false)
+
+    try {
+      const token = localStorage.getItem("token")
+      const response = await fetch("http://localhost:8000/api/ai/tender-requirements", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          category: formData.category,
+          minimum_bid: Number(formData.minimum_bid) || 0,
+          min_compliance: Number(formData.min_compliance) || 0,
+          technical_requirements: formData.technical_requirements,
+          financial_requirements: formData.financial_requirements,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Tender requirements generation failed:", errorText)
+        throw new Error("Failed to generate tender requirements")
+      }
+
+      const data = await response.json()
+      setFormData({ ...formData, requirements: data.requirements || "" })
+    } catch (error) {
+      console.error("Error generating requirements:", error)
+      alert("AI requirements generation failed. Please try again.")
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   const handleSubmit = async () => {
@@ -57,6 +86,10 @@ export default function CreateTenderPage() {
           description: formData.description,
           category: formData.category,
           minimum_bid: minimumBidUSD,
+          min_compliance: Number(formData.min_compliance) || 0,
+          requirements: formData.requirements,
+          technical_requirements: formData.technical_requirements,
+          financial_requirements: formData.financial_requirements,
           start_date: new Date(formData.start_date).toISOString(),
           end_date: new Date(formData.end_date).toISOString(),
           status: "Open",
@@ -205,6 +238,20 @@ export default function CreateTenderPage() {
                 <p className="text-xs text-slate-500">Enter amount in Indian Rupees (e.g., ₹82,50,000)</p>
               </div>
 
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Minimum Compliance Score (%)</label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={formData.min_compliance}
+                  onChange={(e) => setFormData({ ...formData, min_compliance: e.target.value })}
+                  placeholder="e.g., 75"
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+                <p className="text-xs text-slate-500">Optional: minimum compliance percentage required from bidders</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-slate-300">Start Date *</label>
@@ -282,6 +329,22 @@ export default function CreateTenderPage() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-300">Technical Requirements</label>
+                <Textarea
+                  value={formData.technical_requirements}
+                  onChange={(e) => setFormData({ ...formData, technical_requirements: e.target.value })}
+                  placeholder="Optional: Add technical constraints, specs, standards, or acceptance criteria"
+                  className="bg-slate-800 border-slate-700 text-white min-h-28 text-sm"
+                />
+
+                <label className="text-sm font-medium text-slate-300">Financial Requirements</label>
+                <Textarea
+                  value={formData.financial_requirements}
+                  onChange={(e) => setFormData({ ...formData, financial_requirements: e.target.value })}
+                  placeholder="Optional: Budget breakdown, payment terms, invoicing requirements"
+                  className="bg-slate-800 border-slate-700 text-white min-h-28 text-sm"
+                />
+
                 <label className="text-sm font-medium text-slate-300">Requirements *</label>
                 <Textarea
                   value={formData.requirements}
@@ -348,6 +411,13 @@ export default function CreateTenderPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 gap-4 mt-4">
+                  <div className="p-4 bg-slate-800 rounded-lg">
+                    <label className="text-sm text-slate-500">Minimum Compliance</label>
+                    <p className="text-white font-medium mt-1">{formData.min_compliance ? `${formData.min_compliance}%` : "—"}</p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-slate-800 rounded-lg">
                     <label className="text-sm text-slate-500">Start Date</label>
@@ -365,9 +435,26 @@ export default function CreateTenderPage() {
 
                 <div className="p-4 bg-slate-800 rounded-lg">
                   <label className="text-sm text-slate-500">Requirements</label>
-                  <pre className="text-white mt-2 text-sm whitespace-pre-wrap font-mono">
-                    {formData.requirements}
-                  </pre>
+                  <div className="mb-3">
+                    <label className="text-sm text-slate-500">Technical Requirements</label>
+                    <pre className="text-white mt-2 text-sm whitespace-pre-wrap font-mono">
+                      {formData.technical_requirements || "—"}
+                    </pre>
+                  </div>
+
+                  <div className="mb-3">
+                    <label className="text-sm text-slate-500">Financial Requirements</label>
+                    <pre className="text-white mt-2 text-sm whitespace-pre-wrap font-mono">
+                      {formData.financial_requirements || "—"}
+                    </pre>
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-slate-500">Requirements</label>
+                    <pre className="text-white mt-2 text-sm whitespace-pre-wrap font-mono">
+                      {formData.requirements}
+                    </pre>
+                  </div>
                 </div>
               </div>
 

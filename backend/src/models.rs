@@ -52,8 +52,16 @@ pub struct Auction {
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub minimum_bid: f64,
+    #[serde(default)]
+    pub min_compliance: i32,
     #[serde(default = "default_category")]
     pub category: String,
+    #[serde(default)]
+    pub requirements: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub technical_requirements: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub financial_requirements: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -151,8 +159,16 @@ pub struct CreateAuctionRequest {
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub minimum_bid: f64,
+    #[serde(default)]
+    pub min_compliance: i32,
     #[serde(default = "default_category")]
     pub category: String,
+    #[serde(default)]
+    pub requirements: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub technical_requirements: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub financial_requirements: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -163,7 +179,15 @@ pub struct UpdateAuctionRequest {
     pub start_date: DateTime<Utc>,
     pub end_date: DateTime<Utc>,
     pub minimum_bid: f64,
+    #[serde(default)]
+    pub min_compliance: i32,
     pub category: String,
+    #[serde(default)]
+    pub requirements: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub technical_requirements: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub financial_requirements: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
